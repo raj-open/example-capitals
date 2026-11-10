@@ -1,0 +1,63 @@
+{
+  "name": "example-capitals",
+  "version": "0.0.0",
+  "description": "react frontend + REST api backend + DB",
+  "private": true,
+  "type": "module",
+  "homepage": "https://github.com/raj-open/example-capitals",
+  "license": "MPL-2.0",
+  "author": "raj-open",
+  "contributors": [
+    "raj-open <raj-open@users.noreply.github.com>",
+    "artificial intelligence code agent <raj-open-codeagent@users.noreply.github.com>"
+  ],
+  "maintainers": [
+    "raj-open"
+  ],
+  "keywords": [
+    "example",
+    "rest",
+    "db"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "setup": "just setup",
+    "setup:devcontainer": "mkdir -p .devcontainer && cp templates/template-devcontainer.json .devcontainer/devcontainer.json && cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml",
+    "models": "just models",
+    "serve:db": "just serve-db",
+    "stop:db": "just stop-db",
+    "dev": "just dev",
+    "dev:backend": "just dev-backend",
+    "dev:frontend": "just dev-frontend",
+    "build": "just build",
+    "test": "just tests",
+    "test:unit": "just tests-unit",
+    "test:behave": "just tests-behave",
+    "test:integration": "just tests-integration",
+    "test:e2e": "just tests-e2e",
+    "check": "just check",
+    "lint": "just lint-check",
+    "prettify": "just prettify",
+    "clean": "just clean",
+    "clean:all": "just clean-all"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "@cucumber/cucumber": "^13.3.0",
+    "@hey-api/openapi-ts": "0.99.0",
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
+    "concurrently": "^10.0.7",
+    "typescript": "6.0.3",
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "js-yaml": "^5.5.0"
+  }
+}

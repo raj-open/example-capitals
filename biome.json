@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "files": {
+    "includes": [
+      "backend/src/**",
+      "backend/tests/**",
+      "frontend/src/**",
+      "frontend/tests/**",
+      "frontend/vite.config.ts",
+      "tests/**",
+      "db/**",
+      "*.json",
+      "backend/*.json",
+      "frontend/*.json",
+      "templates/*.json"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 4,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "trailingCommas": "all"
+    },
+    "globals": [
+      "db"
+    ]
+  },
+  "json": {
+    "formatter": {
+      "indentWidth": 2,
+      "expand": "always"
+    }
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}
