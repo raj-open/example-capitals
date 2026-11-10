@@ -17,3 +17,7 @@ Feature: Capitals
   Scenario: A capital with an invalid id cannot be deleted
     When I request "DELETE /capital/not-an-id"
     Then the response status is 404
+
+  Scenario: Other cities are rejected by /capital
+    When I send "POST /capital" with body {"name": "Osaka", "country": "Japan", "latitude": 34.69, "longitude": 135.5, "capital": false}
+    Then the response status is 400
