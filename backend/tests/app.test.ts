@@ -35,12 +35,8 @@ describe("/health", () => {
     });
 });
 
+// NOTE: no database here, so only requests that fail before the DB is reached
 describe("/capital", () => {
-    it("is not implemented yet", async () => {
-        const response = await fetch(`${base}/capital`);
-        expect(response.status).toBe(501);
-    });
-
     it("rejects an invalid body before touching the DB", async () => {
         const response = await fetch(`${base}/capital`, {
             method: "POST",
@@ -48,5 +44,23 @@ describe("/capital", () => {
             body: JSON.stringify({ name: "" }),
         });
         expect(response.status).toBe(400);
+    });
+
+    it("rejects an invalid body on update", async () => {
+        const response = await fetch(`${base}/capital/0123456789abcdef01234567`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Paris", country: "France", latitude: 91, longitude: 0 }),
+        });
+        expect(response.status).toBe(400);
+    });
+
+    it.each(["PUT", "DELETE"])("treats an invalid id as not found (%s)", async (method) => {
+        const response = await fetch(`${base}/capital/not-an-id`, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Paris", country: "France", latitude: 48.86, longitude: 2.35 }),
+        });
+        expect(response.status).toBe(404);
     });
 });

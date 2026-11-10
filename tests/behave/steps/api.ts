@@ -41,8 +41,11 @@ After(function (this: State) {
 // ----------------------------------------------------------------
 
 When("I request {string}", async function (this: State, request: string) {
-    const [method, path] = request.split(" ");
-    this.response = await fetch(`${this.base}${path}`, { method });
+    this.response = await send(this.base, request);
+});
+
+When("I send {string} with body {}", async function (this: State, request: string, body: string) {
+    this.response = await send(this.base, request, JSON.parse(body));
 });
 
 Then("the response status is {int}", function (this: State, status: number) {
@@ -52,3 +55,24 @@ Then("the response status is {int}", function (this: State, status: number) {
 Then("the response body is {}", async function (this: State, body: string) {
     assert.deepEqual(await this.response.json(), JSON.parse(body));
 });
+
+// ----------------------------------------------------------------
+// AUXILIARY METHODS
+// ----------------------------------------------------------------
+
+/**
+ * Sends a request given as `"{METHOD} {path}"`, with an optional JSON body.
+ */
+async function send(base: string, request: string, body?: unknown): Promise<Response> {
+    const [method, path] = request.split(" ");
+
+    if (body === undefined) {
+        return fetch(`${base}${path}`, { method });
+    }
+
+    return fetch(`${base}${path}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+}
