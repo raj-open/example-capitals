@@ -1,5 +1,5 @@
 /**
- * Endpoints: /capital (capitals only, as in the brief) and /city (all cities), same shape.
+ * Endpoints: /capital (capitals only) and /city (all cities), same shape.
  */
 
 // ----------------------------------------------------------------

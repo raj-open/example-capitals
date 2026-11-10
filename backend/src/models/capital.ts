@@ -45,7 +45,7 @@ export function toCapital({ _id, ...rest }: CapitalDocument): Capital {
 }
 
 /**
- * Validates a request body; `capital` defaults to true (so a body as in the brief creates a capital).
+ * Validates a request body; `capital` defaults to true (so a body without it creates a capital).
  * Only checks types and ranges, not uniqueness (enforced by the DB indexes).
  */
 export function parseCapitalInput(body: unknown): CapitalData {
