@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
     return {
         plugins: [react()],
         envDir: root,
+        // static files (icons), served at / and copied as they are into the build
+        publicDir: "assets",
         build: {
             // mapbox-gl alone is ~1.9 MB minified and cannot be split; it is loaded lazily (see /frontend/src/App.tsx)
             chunkSizeWarningLimit: 2000,

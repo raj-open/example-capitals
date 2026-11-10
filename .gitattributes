@@ -1,5 +1,11 @@
-# Forces (staged) text files (i.e. nonbinaries) to be saved with LF instead of CRLF-endings
-# * text=auto
+# Text files (detected by git) are saved with LF, both remotely and locally;
+# binaries are left as they are (`* text` would treat them as text and strip CR bytes, damaging images)
+* text=auto eol=lf
 
-# Forces text files (i.e. nonbinaries) both remotely and locally to be saved with LF
-* text eol=lf
+# images: always binary, whatever git detects
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.png binary
+*.webp binary

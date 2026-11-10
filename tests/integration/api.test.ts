@@ -23,8 +23,14 @@ import type { Capital, CapitalInput } from "../../backend/src/models/capital.ts"
 // LOCAL CONSTANTS
 // ----------------------------------------------------------------
 
-const FIRST: CapitalInput = { name: "Testopolis", country: "Testland", latitude: 10, longitude: 20 };
-const SECOND: CapitalInput = { name: "Testburg", country: "Testonia", latitude: -10.5, longitude: -20.5 };
+const FIRST: CapitalInput = { name: "Testopolis", country: "Testland", latitude: 10, longitude: 20, capital: true };
+const SECOND: CapitalInput = {
+    name: "Testburg",
+    country: "Testonia",
+    latitude: -10.5,
+    longitude: -20.5,
+    capital: true,
+};
 
 // ----------------------------------------------------------------
 // LOCAL VARIABLES
@@ -74,10 +80,21 @@ describe("/capital", () => {
         expect(items).toContainEqual(first);
         expect(items).toContainEqual(second);
 
-        // same ordering as the collation of the collection (locale en, strength 2)
-        const countries = items.map(({ country }) => country);
+        // same ordering as the collation of the collection (locale en, strength 2): by country, capital first, then name
         const collator = new Intl.Collator("en", { sensitivity: "accent" });
-        expect(countries).toEqual([...countries].sort(collator.compare));
+        const keys = items.map(({ country, capital, name }) => [country, capital, name] as const);
+        const sorted = [...keys].sort(
+            (a, b) => collator.compare(a[0], b[0]) || Number(b[1]) - Number(a[1]) || collator.compare(a[2], b[2]),
+        );
+        expect(keys).toEqual(sorted);
+    });
+
+    it("finds a capital by id", async () => {
+        const created = await create(FIRST);
+
+        const response = await send("GET", `/capital/${created.id}`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(created);
     });
 
     it("finds a capital by name, case-insensitively", async () => {
@@ -118,22 +135,53 @@ describe("/capital", () => {
         expect(response.status).toBe(404);
     });
 
-    it("rejects duplicate names and countries with 409", async () => {
+    it("allows several cities per country and a name in several countries", async () => {
+        await create(FIRST);
+        await createCity({ ...FIRST, name: SECOND.name, latitude: 1, capital: false });
+        await create({ ...SECOND, name: FIRST.name });
+    });
+
+    it("keeps other cities out of /capital, but lists them in /city", async () => {
+        const capital = await create(FIRST);
+        const other = await createCity({ ...FIRST, name: SECOND.name, capital: false });
+
+        let items: Capital[] = await (await send("GET", "/capital")).json();
+        expect(items).toContainEqual(capital);
+        expect(items).not.toContainEqual(other);
+
+        items = await (await send("GET", "/city")).json();
+        expect(items).toContainEqual(capital);
+        expect(items).toContainEqual(other);
+
+        expect((await send("GET", `/capital/${other.id}`)).status).toBe(404);
+        expect((await send("GET", `/city/${other.id}`)).status).toBe(200);
+        expect((await send("POST", "/capital", { ...SECOND, capital: false })).status).toBe(400);
+        expect((await send("DELETE", `/capital/${other.id}`)).status).toBe(404);
+        expect((await send("DELETE", `/city/${other.id}`)).status).toBe(204);
+    });
+
+    it("defaults to a capital and rejects a second capital of a country with 409", async () => {
+        const { capital: _, ...body } = FIRST;
+        expect(await create(body)).toMatchObject({ capital: true });
+
+        const response = await send("POST", "/capital", { ...FIRST, name: SECOND.name });
+        expect(response.status).toBe(409);
+    });
+
+    it("rejects a duplicate (country, name) with 409", async () => {
         await create(FIRST);
 
-        // case-insensitive, via the collation of the unique indexes
-        let response = await send("POST", "/capital", { ...SECOND, name: FIRST.name.toLowerCase() });
-        expect(response.status).toBe(409);
-
-        response = await send("POST", "/capital", { ...SECOND, country: FIRST.country.toUpperCase() });
+        // case-insensitive, via the collation of the unique index
+        let response = await send("POST", "/capital", {
+            ...FIRST,
+            country: FIRST.country.toUpperCase(),
+            name: FIRST.name.toLowerCase(),
+        });
         expect(response.status).toBe(409);
 
         const second = await create(SECOND);
 
-        response = await send("PUT", `/capital/${second.id}`, { ...SECOND, name: FIRST.name });
-        expect(response.status).toBe(409);
-
-        response = await send("PUT", `/capital/${second.id}`, { ...SECOND, country: FIRST.country });
+        response = await send("PUT", `/capital/${second.id}`, { ...SECOND, country: FIRST.country, name: FIRST.name });
         expect(response.status).toBe(409);
     });
 
@@ -159,10 +207,14 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
     });
 }
 
-async function create(input: CapitalInput): Promise<Capital> {
-    const response = await send("POST", "/capital", input);
+async function create(input: CapitalInput, resource = "capital"): Promise<Capital> {
+    const response = await send("POST", `/${resource}`, input);
     expect(response.status).toBe(201);
     return response.json();
+}
+
+async function createCity(input: CapitalInput): Promise<Capital> {
+    return create(input, "city");
 }
 
 /**

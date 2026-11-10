@@ -44,6 +44,22 @@ export function db(): Db {
     return client.db(settings.database.name);
 }
 
+/**
+ * Whether the database answers (ping); false if not connected.
+ */
+export async function ping(): Promise<boolean> {
+    if (!client) {
+        return false;
+    }
+
+    try {
+        await client.db("admin").command({ ping: 1 }, { timeoutMS: 2000 });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export async function close(): Promise<void> {
     await client?.close();
     client = undefined;

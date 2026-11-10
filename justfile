@@ -77,6 +77,12 @@ serve-db:
 stop-db:
     docker compose stop db
 
+# clear the database: remove its volume and start it again (/db/schema.js runs on the empty volume)
+[group('run')]
+clear-db:
+    -docker compose down --volumes
+    docker compose up -d db
+
 # run backend and frontend with hot reload
 [group('run')]
 dev: _deps
@@ -130,6 +136,16 @@ tests-integration: _deps
 tests-e2e: _deps
     npx --no -- playwright install chromium
     npx --no -- playwright test --config tests/e2e/playwright.config.ts
+
+# ----------------------------------------------------------------
+# DOCS
+# ----------------------------------------------------------------
+
+# screenshots for /demos (WebP) and the social preview of the repo (UI + API + DB); needs `just serve-db` and capitals in the DB
+[group('docs')]
+demos: _deps
+    npx --no -- playwright install chromium
+    npx --no -- playwright test --config tests/demos/playwright.config.ts
 
 # ----------------------------------------------------------------
 # QUALITY

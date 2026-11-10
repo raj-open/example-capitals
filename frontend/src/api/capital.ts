@@ -1,5 +1,5 @@
 /**
- * Endpoints: /capital
+ * Endpoints: /capital (capitals only) and /city (all cities), same shape.
  */
 
 // ----------------------------------------------------------------
@@ -10,15 +10,23 @@ import type { Capital, CapitalInput } from "../../@api/types.gen.ts";
 import { request } from "./client.ts";
 
 // ----------------------------------------------------------------
+// TYPES
+// ----------------------------------------------------------------
+
+export type Resource = "capital" | "city";
+
+// ----------------------------------------------------------------
 // METHODS
 // ----------------------------------------------------------------
 
-export const list = () => request<Capital[]>("GET", "/capital");
+export const list = (resource: Resource) => request<Capital[]>("GET", `/${resource}`);
 
-export const get = (name: string) => request<Capital>("GET", `/capital/${encodeURIComponent(name)}`);
+export const get = (resource: Resource, key: string) =>
+    request<Capital>("GET", `/${resource}/${encodeURIComponent(key)}`);
 
-export const create = (input: CapitalInput) => request<Capital>("POST", "/capital", input);
+export const create = (resource: Resource, input: CapitalInput) => request<Capital>("POST", `/${resource}`, input);
 
-export const update = (id: string, input: CapitalInput) => request<Capital>("PUT", `/capital/${id}`, input);
+export const update = (resource: Resource, id: string, input: CapitalInput) =>
+    request<Capital>("PUT", `/${resource}/${id}`, input);
 
-export const remove = (id: string) => request<void>("DELETE", `/capital/${id}`);
+export const remove = (resource: Resource, id: string) => request<void>("DELETE", `/${resource}/${id}`);

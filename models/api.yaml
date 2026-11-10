@@ -10,18 +10,23 @@ paths:
       summary: liveness incl. DB ping
       responses:
         "200":
-          description: ok
+          description: API and database up
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: database unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
 
+  # /capital: capitals only; a city with `capital: false` is rejected with 400 (use /city)
+  # /city: all cities; same shape and operations
   /capital:
     get:
-      summary: all capital cities
+      summary: all capital cities, by country
       responses:
         "200":
           description: ok
@@ -54,12 +59,14 @@ paths:
       - name: key
         in: path
         required: true
-        description: name (case-insensitive) for GET, id for PUT and DELETE
+        description: >-
+          id or name (case-insensitive) for GET, id for PUT and DELETE;
+          names are not unique across countries, so GET by name returns the first by country
         schema:
           type: string
 
     get:
-      summary: one capital city by name (case-insensitive)
+      summary: one capital city by id or name (case-insensitive)
       responses:
         "200":
           $ref: "#/components/responses/Capital"
@@ -92,9 +99,132 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
+  /city:
+    get:
+      summary: all cities (capitals and others), by country, the capital first, then by name
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Capital"
+
+    post:
+      summary: create a city
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CapitalInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/Capital"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /city/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        description: >-
+          id or name (case-insensitive) for GET, id for PUT and DELETE;
+          names are not unique across countries, so GET by name returns the first by country
+        schema:
+          type: string
+
+    get:
+      summary: one city by id or name (case-insensitive)
+      responses:
+        "200":
+          $ref: "#/components/responses/Capital"
+        "404":
+          $ref: "#/components/responses/Error"
+
+    put:
+      summary: update a city
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CapitalInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Capital"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+    delete:
+      summary: delete a city
+      responses:
+        "204":
+          description: deleted
+        "404":
+          $ref: "#/components/responses/Error"
+
+  # /data: clear and fill the DB (for tests and demos); 403 if disabled (DATA_ACTIONS=false)
+  /data:
+    delete:
+      summary: remove all cities
+      responses:
+        "200":
+          $ref: "#/components/responses/Count"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /data/examples:
+    post:
+      summary: add the example cities (existing ones are skipped)
+      responses:
+        "200":
+          $ref: "#/components/responses/Count"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /data/capitals:
+    post:
+      summary: import all capitals from REST Countries (costs requests of the monthly quota)
+      responses:
+        "200":
+          $ref: "#/components/responses/Count"
+        "403":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+  /data/cities:
+    post:
+      summary: add a large sample of ordinary cities (existing ones are skipped)
+      responses:
+        "200":
+          $ref: "#/components/responses/Count"
+        "403":
+          $ref: "#/components/responses/Error"
+
 components:
   schemas:
+    Health:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
     CapitalInput:
+      description: >-
+        a city of a country; unique per (country, name), case-insensitive;
+        at most one capital per country
       type: object
       required:
         - name
@@ -116,6 +246,13 @@ components:
           type: number
           minimum: -180
           maximum: 180
+        capital:
+          type: boolean
+          description: whether the city is the capital of its country (default true)
+        colour:
+          type: string
+          description: colour of the marker; without it, the UI uses its default
+          pattern: "^#[0-9a-fA-F]{6}$"
 
     Capital:
       allOf:
@@ -123,9 +260,17 @@ components:
         - type: object
           required:
             - id
+            - capital
           properties:
+            capital:
+              type: boolean
             id:
               type: string
+              description: >-
+                derived from country and name on creation
+                (UUIDv5 as 22 base62 characters in groups, e.g. `1aB2cD3-eF4gH5i-J6kL7mN8`);
+                does not change when they are edited
+              pattern: "^[0-9A-Za-z]{7}-[0-9A-Za-z]{7}-[0-9A-Za-z]{8}$"
 
     Error:
       type: object
@@ -133,7 +278,23 @@ components:
         error:
           type: string
 
+    Count:
+      description: number of cities removed or added
+      type: object
+      required:
+        - count
+      properties:
+        count:
+          type: integer
+
   responses:
+    Count:
+      description: ok
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Count"
+
     Capital:
       description: ok
       content:

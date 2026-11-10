@@ -10,7 +10,8 @@ import cors from "cors";
 import express, { type Express } from "express";
 
 import { handleErrors } from "./_core/errors.ts";
-import { router as capital } from "./routes/capital.ts";
+import { createRouter } from "./routes/capital.ts";
+import { router as data } from "./routes/data.ts";
 import { router as health } from "./routes/health.ts";
 
 // ----------------------------------------------------------------
@@ -24,7 +25,9 @@ export function createApp(): Express {
     app.use(express.json());
 
     app.use("/health", health);
-    app.use("/capital", capital);
+    app.use("/capital", createRouter({ capitalsOnly: true }));
+    app.use("/city", createRouter({ capitalsOnly: false }));
+    app.use("/data", data);
 
     app.use(handleErrors);
     return app;

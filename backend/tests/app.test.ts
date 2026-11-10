@@ -29,9 +29,10 @@ afterAll(() => {
 });
 
 describe("/health", () => {
-    it("responds ok", async () => {
+    it("reports the database as unreachable (none here)", async () => {
         const response = await fetch(`${base}/health`);
-        expect(await response.json()).toEqual({ ok: true });
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ ok: false });
     });
 });
 
