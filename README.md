@@ -11,12 +11,16 @@
 
 An API + UI with a MongoDB database, via which one can create, edit, view, and delete capital cities.
 
-<!-- TODO: preview image, once available -->
-<!-- ![List of capitals next to the map, with a marker per capital](demos/img/preview.webp) -->
+![Capital Cities: list next to the map, search, editing, map settings and phones](demos/img/hero.webp)
 
 ## Demonstration ##
 
-See the [demos](demos/README.md).
+See the [demos](demos/README.md), on desktop and on phones.
+To capture them again from the running app (needs `just serve-db` and capitals in the DB):
+
+```bash
+just demos
+```
 
 ## Stack ##
 
@@ -30,7 +34,7 @@ See the [demos](demos/README.md).
 
 ## Requirements ##
 
-- Node.js ≥ 22.18 and npm
+- Node.js ≥ 22.18 and npm (the backend runs TypeScript natively, which needs type stripping without flags, i.e. Node.js 22.18 or newer)
 
 - Docker (for the database)
 
@@ -43,7 +47,7 @@ See the [demos](demos/README.md).
 ```bash
 just setup      # creates .env from templates/template.env (fill in the values), installs dependencies
 just serve-db   # starts MongoDB on localhost:${DATABASE_PORT}
-just dev        # UI on http://localhost:5173, API on http://localhost:${PORT} (GET /health -> {"ok":true})
+just dev        # UI on http://localhost:5173, API on http://localhost:${PORT} (GET /health -> {"ok": true})
 ```
 
 `PORT` and `DATABASE_PORT` are the values from `.env` (3001 and 27017 in [the template](templates/template.env)).
@@ -68,12 +72,14 @@ All endpoints and their payloads are described in [models/api.yaml](models/api.y
 
 | Method | Path | Body | Responses |
 | :----- | :--- | :--- | :-------- |
-| `GET` | `/health` | – | `200` `{"ok": true}` |
+| `GET` | `/health` | – | `200` `{"ok": true}`, `503` `{"ok": false}` if the database does not answer |
 | `GET` | `/capital` | – | `200` all capitals, sorted by country |
-| `GET` | `/capital/{name}` | – | `200` the capital, `404` if there is none |
+| `GET` | `/capital/{key}` | – | `200` the capital with this id or name, `404` if there is none |
 | `POST` | `/capital` | capital | `201` the created capital, `400`, `409` |
 | `PUT` | `/capital/{id}` | capital | `200` the updated capital, `400`, `404`, `409` |
 | `DELETE` | `/capital/{id}` | – | `204`, `404` |
+
+`/city` offers the same operations for all cities (capitals and others); `/capital` only lists capitals and rejects other cities with `400`.
 
 A capital is sent as
 
@@ -86,13 +92,17 @@ A capital is sent as
 }
 ```
 
-and returned with its `id`, which `PUT` and `DELETE` expect:
+and returned with its `id` (which `PUT` and `DELETE` expect), whether it is a capital, and the colour of its marker once one is set:
 
 ```json
 {
-  "id": "6731f0c2a1b2c3d4e5f60718",
+  "id": "4wscVcG-GGEdmTr-BjlOlkL8",
   "name": "Tokyo",
-  ...
+  "country": "Japan",
+  "latitude": 35.68,
+  "longitude": 139.69,
+  "capital": true,
+  "colour": "#d32f2f"
 }
 ```
 
@@ -100,9 +110,13 @@ Rules:
 
 - `name` and `country` are non-empty strings, `latitude` lies in [-90, 90] and `longitude` in [-180, 180], otherwise `400`.
 
-- Names and countries are unique, ignoring case: a second `tokyo` or `JAPAN` gives `409`.
+- `capital` is optional and defaults to `true`; `colour` is optional (`#rrggbb`).
 
-- `GET /capital/{name}` ignores case, too; URL-encode names with spaces (e.g. `/capital/Buenos%20Aires`).
+- A country has at most one capital, and a name is unique within its country, both ignoring case: a second capital of `JAPAN` or a second `tokyo` in Japan gives `409`.
+
+- `GET /capital/{key}` ignores case, too; URL-encode names with spaces (e.g. `/capital/Buenos%20Aires`).
+
+- The `id` is derived from country and name (UUIDv5 as 22 base62 characters) when a capital is created, and kept from then on, even if `PUT` renames it.
 
 - `PUT` replaces all fields, so it needs the full capital.
 
@@ -131,8 +145,18 @@ curl -s -X PUT localhost:3001/capital/<id> \
 curl -s -X DELETE localhost:3001/capital/<id>
 ```
 
-> [!NOTE]
-> The import of the capitals from REST Countries at startup is not implemented yet, so the database starts empty: add capitals via `POST` first.
+## Data ##
+
+On startup, the backend imports all countries and their capitals from [REST Countries](https://restcountries.com) v5 (`country` = common name, `name` = first capital). The import is skipped if capitals are already stored, so restarts do not use up the monthly quota; set `RESTCOUNTRIES_REFRESH=true` in `.env` to import again. `RESTCOUNTRIES_POPULATION_MIN` and `RESTCOUNTRIES_TOP` narrow the selection by population.
+
+The data panel on the map (and the endpoints below) clears and fills the database, for tests and demos. Set `DATA_ACTIONS=false` where data must be kept.
+
+| Method | Path | Does |
+| :----- | :--- | :--- |
+| `DELETE` | `/data` | removes all cities |
+| `POST` | `/data/capitals` | imports the capitals from REST Countries (costs requests of the quota) |
+| `POST` | `/data/examples` | adds a few example cities |
+| `POST` | `/data/cities` | adds 300 ordinary cities (Natural Earth, public domain) |
 
 ## Tests ##
 
@@ -159,7 +183,7 @@ just tests-behave
 ### End-to-end tests ###
 
 Open the UI in a browser against the real API and database, in [tests/e2e](tests/e2e).
-The API and UI are started automatically; the first run downloads a browser (Chromium).
+The API and UI are started automatically; the first run downloads a browser (Chromium). They only create made-up capitals and remove them again, so the data of `just dev` is kept.
 
 ```bash
 just serve-db
