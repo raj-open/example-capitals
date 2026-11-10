@@ -16,6 +16,8 @@
 !/src
 !/src/**/
 !/src/**/*.ts
+# datasets (see /backend/src/data)
+!/src/data/*.json
 
 !/tests
 !/tests/**/
