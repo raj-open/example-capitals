@@ -1,0 +1,43 @@
+# ----------------------------------------------------------------
+# VOLUMES
+# ----------------------------------------------------------------
+
+volumes:
+  # named volume for the MongoDB data (default settings)
+  dbdata:
+
+# ----------------------------------------------------------------
+# SERVICES
+# ----------------------------------------------------------------
+
+services:
+  # --------------------------------
+  # SERVICE: WORKSPACE
+  # --------------------------------
+  app:
+    image: mcr.microsoft.com/devcontainers/typescript-node:1-24-bookworm
+
+    env_file:
+      # NOTE: compose runs from /.devcontainer, so the repo-root .env is only read via env_file (no interpolation).
+      - path: ../.env
+        required: false
+
+    # the db is internal to the container network, hence without auth
+    environment:
+      DATABASE_HOST: db
+      DATABASE_USER: ""
+
+    volumes:
+      - "..:/workspace:cached"
+
+    command: sleep infinity
+
+  # --------------------------------
+  # SERVICE: MongoDB
+  # --------------------------------
+  db:
+    image: mongo:9
+
+    volumes:
+      - dbdata:/data/db
+      - ../db/schema.js:/docker-entrypoint-initdb.d/schema.js:ro

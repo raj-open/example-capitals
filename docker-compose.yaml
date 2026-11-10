@@ -1,0 +1,33 @@
+# project name: prefixes container, network and volume; `docker compose` commands only act on these
+name: ${DOCKER_PROJECT}
+
+# ----------------------------------------------------------------
+# VOLUMES
+# ----------------------------------------------------------------
+
+volumes:
+  # named volume for the MongoDB data (default settings), kept until `just clean-docker`
+  dbdata:
+
+# ----------------------------------------------------------------
+# SERVICES
+# ----------------------------------------------------------------
+
+services:
+  # --------------------------------
+  # SERVICE: MongoDB
+  # --------------------------------
+  db:
+    image: mongo:9
+
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${DATABASE_USER:-}"
+      MONGO_INITDB_ROOT_PASSWORD: "${DATABASE_PASSWORD:-}"
+      DATABASE_NAME: "${DATABASE_NAME:-capitals}"
+
+    ports:
+      - "127.0.0.1:${DATABASE_PORT:-27017}:27017"
+
+    volumes:
+      - dbdata:/data/db
+      - ./db/schema.js:/docker-entrypoint-initdb.d/schema.js:ro

@@ -1,0 +1,25 @@
+{
+  "name": "example-capitals",
+  "dockerComposeFile": "devcontainer-compose.yaml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "npm ci",
+  "forwardPorts": [
+    5173,
+    3001
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "frontend",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "secrets": {
+    "RESTCOUNTRIES_API_KEY": {
+      "description": "restcountries.com API key"
+    },
+    "VITE_MAPBOX_TOKEN": {
+      "description": "Mapbox public token (pk.*)"
+    }
+  }
+}
