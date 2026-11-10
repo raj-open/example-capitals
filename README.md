@@ -60,6 +60,80 @@ Run `just` for all recipes.
 
 No Docker or Node on the host? Run `npm run setup:devcontainer` (needs only Node and npm, no just), then open the repo in a dev container (MongoDB included). The dev container config is copied from [templates](templates), so for a GitHub Codespace commit the generated `.devcontainer` folder to a fork first.
 
+## API ##
+
+The API listens on `http://localhost:${PORT}` (3001 in [the template](templates/template.env)).
+While `just dev` runs, the same endpoints are also reachable via the UI's dev server under `http://localhost:5173/api`.
+All endpoints and their payloads are described in [models/api.yaml](models/api.yaml).
+
+| Method | Path | Body | Responses |
+| :----- | :--- | :--- | :-------- |
+| `GET` | `/health` | – | `200` `{"ok": true}` |
+| `GET` | `/capital` | – | `200` all capitals, sorted by country |
+| `GET` | `/capital/{name}` | – | `200` the capital, `404` if there is none |
+| `POST` | `/capital` | capital | `201` the created capital, `400`, `409` |
+| `PUT` | `/capital/{id}` | capital | `200` the updated capital, `400`, `404`, `409` |
+| `DELETE` | `/capital/{id}` | – | `204`, `404` |
+
+A capital is sent as
+
+```json
+{
+  "name": "Tokyo",
+  "country": "Japan",
+  "latitude": 35.68,
+  "longitude": 139.69
+}
+```
+
+and returned with its `id`, which `PUT` and `DELETE` expect:
+
+```json
+{
+  "id": "6731f0c2a1b2c3d4e5f60718",
+  "name": "Tokyo",
+  ...
+}
+```
+
+Rules:
+
+- `name` and `country` are non-empty strings, `latitude` lies in [-90, 90] and `longitude` in [-180, 180], otherwise `400`.
+
+- Names and countries are unique, ignoring case: a second `tokyo` or `JAPAN` gives `409`.
+
+- `GET /capital/{name}` ignores case, too; URL-encode names with spaces (e.g. `/capital/Buenos%20Aires`).
+
+- `PUT` replaces all fields, so it needs the full capital.
+
+- An unknown or malformed `id` gives `404`.
+
+- Errors come back as `{"error": "<message>"}`.
+
+Examples (with `PORT=3001`):
+
+```bash
+# create
+curl -s -X POST localhost:3001/capital \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Tokyo", "country": "Japan", "latitude": 35.68, "longitude": 139.69}'
+
+# read
+curl -s localhost:3001/capital
+curl -s localhost:3001/capital/tokyo
+
+# update (id from the responses above)
+curl -s -X PUT localhost:3001/capital/<id> \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Tokyo", "country": "Japan", "latitude": 35.69, "longitude": 139.69}'
+
+# delete
+curl -s -X DELETE localhost:3001/capital/<id>
+```
+
+> [!NOTE]
+> The import of the capitals from REST Countries at startup is not implemented yet, so the database starts empty: add capitals via `POST` first.
+
 ## Tests ##
 
 Run everything at once with `just tests` (start the database first with `just serve-db`), or each kind on its own as below.
@@ -117,10 +191,7 @@ curl -s localhost:3001/health
 curl -s localhost:3001/capital
 ```
 
-All endpoints and their payloads are described in [models/api.yaml](models/api.yaml).
-
-> [!NOTE]
-> The `/capital` endpoints are stubs for now and answer `501`.
+See [API](#api) for all endpoints and examples.
 
 ## Linting ##
 
