@@ -119,7 +119,7 @@ export function CapitalList() {
         return (
             <button
                 type="button"
-                className="sidebar-handle"
+                className="sidebar-handle sidebar-toggle"
                 title="Show list"
                 aria-label="Show list"
                 onClick={() => setCollapsed(false)}
@@ -138,7 +138,13 @@ export function CapitalList() {
                     <button type="button" title="Add" aria-label="Add capital" onClick={() => setEditing(NEW)}>
                         <Plus />
                     </button>
-                    <button type="button" title="Hide list" aria-label="Hide list" onClick={() => setCollapsed(true)}>
+                    <button
+                        type="button"
+                        className="sidebar-toggle"
+                        title="Hide list"
+                        aria-label="Hide list"
+                        onClick={() => setCollapsed(true)}
+                    >
                         <Chevron />
                     </button>
                 </div>

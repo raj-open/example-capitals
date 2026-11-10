@@ -35,6 +35,8 @@ body,
 #root {
     height: 100%;
     margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
     background: var(--bg);
     color: var(--text);
     font-family: system-ui, sans-serif;
@@ -54,9 +56,10 @@ input {
     outline-offset: 1px;
 }
 
+/* NOTE: dvh follows the visible height on phones (address bar shown or hidden) */
 .layout {
     display: flex;
-    height: 100%;
+    height: 100dvh;
 }
 
 .error {
@@ -71,7 +74,6 @@ input {
     display: flex;
     flex-direction: column;
     width: clamp(20rem, 30vw, 32rem);
-    height: 100vh;
     border-right: 1px solid var(--border);
     background: var(--bg);
 }
@@ -123,7 +125,6 @@ input {
     align-items: center;
     gap: 0.75rem;
     width: 1.75rem;
-    height: 100vh;
     padding: 1rem 0;
     border: none;
     border-right: 1px solid var(--border);
@@ -170,6 +171,7 @@ input {
 
 .sidebar ul {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     margin: 0;
     padding: 0.25rem 0;
@@ -331,6 +333,31 @@ input {
     gap: 0.4rem;
 }
 
+/* capital (checkbox) on the left, colour on the right */
+.capital-form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sidebar .capital-form-colour {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    font-size: 0.8rem;
+}
+
+.sidebar .capital-form-colour input {
+    width: 2.25rem;
+    height: 1.5rem;
+    padding: 0.1rem;
+    border-radius: 0.4rem;
+    background: none;
+    cursor: pointer;
+}
+
 .capital-form-row > * {
     flex: 1;
 }
@@ -362,6 +389,8 @@ input {
 .map {
     position: relative;
     flex: 1;
+    min-width: 0;
+    min-height: 0;
 }
 
 /* NOTE: two classes, as mapbox-gl.css (loaded later) sets `position: relative` on the map container */
@@ -386,7 +415,7 @@ input {
     opacity: 1;
 }
 
-/* square marker per capital, as per brief (32px × 32px); smaller when zoomed out (--marker-size, set by MapView) */
+/* square marker per capital (32px × 32px); smaller when zoomed out (--marker-size, set by MapView) */
 .marker {
     --size: var(--marker-size, 32px);
     width: var(--size);
@@ -442,7 +471,38 @@ input {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+}
+
+/* colour on the left, delete on the right */
+.popup-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
     margin-top: 0.5rem;
+}
+
+.map .popup-actions button {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.map .popup-actions button:hover {
+    background: var(--subtle);
+    color: #e5484d;
+}
+
+.popup .error {
+    margin: 0.4rem 0 0;
+    font-size: 0.8rem;
 }
 
 /* ---------------------------------------------------------------- */
@@ -497,7 +557,10 @@ input {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    width: 17rem;
+    width: min(17rem, calc(100vw - 5rem));
+    max-height: 70dvh;
+    box-sizing: border-box;
+    overflow-y: auto;
     padding: 0.75rem;
     border-radius: 0.75rem;
     background: var(--surface);
@@ -604,4 +667,95 @@ input {
 
 .map-panel-body fieldset:disabled {
     opacity: 0.4;
+}
+
+/* ---------------------------------------------------------------- */
+/* touch: larger targets, no hover (actions always visible), 16px inputs (iOS zooms into smaller ones) */
+/* ---------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+    .sidebar-title button,
+    .sidebar .actions button {
+        width: 2.25rem;
+        height: 2.25rem;
+    }
+
+    .sidebar input,
+    .sidebar-search input,
+    .map-panel .map-settings-select {
+        font-size: 16px;
+    }
+
+    .sidebar .entry {
+        padding: 0.2rem 0;
+    }
+
+    .map-panel .map-settings-options button,
+    .map-panel .data-actions button {
+        padding: 0.55rem 0.4rem;
+    }
+}
+
+@media (hover: none) {
+    .sidebar .actions {
+        visibility: visible;
+    }
+
+    .sidebar li:hover {
+        background: none;
+    }
+}
+
+/* ---------------------------------------------------------------- */
+/* phones (narrow): map on top, the list as a sheet below it, collapsible to a bar */
+/* ---------------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+    .layout {
+        flex-direction: column-reverse;
+    }
+
+    .sidebar {
+        flex: none;
+        width: auto;
+        height: 45%;
+        padding-bottom: env(safe-area-inset-bottom);
+        border-top: 1px solid var(--border);
+        border-right: none;
+    }
+
+    .sidebar header {
+        padding: 0.5rem 0.75rem 0.4rem;
+    }
+
+    .sidebar h2 {
+        font-size: 1.2rem;
+    }
+
+    .sidebar-handle {
+        flex-direction: row;
+        justify-content: center;
+        width: auto;
+        padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--border);
+        border-right: none;
+    }
+
+    .sidebar-handle span {
+        writing-mode: horizontal-tb;
+    }
+
+    /* chevrons point up (show) and down (hide) instead of right and left */
+    .sidebar-toggle svg {
+        transform: rotate(-90deg);
+    }
+
+    .map-controls {
+        top: calc(0.5rem + env(safe-area-inset-top));
+        right: calc(0.5rem + env(safe-area-inset-right));
+    }
+
+    .map .mapboxgl-popup-content {
+        max-width: calc(100vw - 3rem);
+    }
 }
