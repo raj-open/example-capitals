@@ -1,0 +1,149 @@
+openapi: 3.1.0
+
+info:
+  title: Example – Capitals
+  version: 0.0.0
+
+paths:
+  /health:
+    get:
+      summary: liveness incl. DB ping
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+
+  /capital:
+    get:
+      summary: all capital cities
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Capital"
+
+    post:
+      summary: create a capital city
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CapitalInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/Capital"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  # NOTE: one templated path, since /capital/{name} and /capital/{id} would collide
+  /capital/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        description: name (case-insensitive) for GET, id for PUT and DELETE
+        schema:
+          type: string
+
+    get:
+      summary: one capital city by name (case-insensitive)
+      responses:
+        "200":
+          $ref: "#/components/responses/Capital"
+        "404":
+          $ref: "#/components/responses/Error"
+
+    put:
+      summary: update a capital city
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CapitalInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Capital"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+    delete:
+      summary: delete a capital city
+      responses:
+        "204":
+          description: deleted
+        "404":
+          $ref: "#/components/responses/Error"
+
+components:
+  schemas:
+    CapitalInput:
+      type: object
+      required:
+        - name
+        - country
+        - latitude
+        - longitude
+      properties:
+        name:
+          type: string
+          minLength: 1
+        country:
+          type: string
+          minLength: 1
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+
+    Capital:
+      allOf:
+        - $ref: "#/components/schemas/CapitalInput"
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+  responses:
+    Capital:
+      description: ok
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Capital"
+
+    Error:
+      description: error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
