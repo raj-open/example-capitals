@@ -3,6 +3,7 @@
 // ----------------------------------------------------------------
 
 import { describe, expect, it } from "vitest";
+
 import { BadRequestError } from "../src/_core/errors.ts";
 import { parseCapitalInput } from "../src/models/capital.ts";
 

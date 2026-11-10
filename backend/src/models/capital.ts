@@ -9,6 +9,7 @@
 // ----------------------------------------------------------------
 
 import type { ObjectId } from "mongodb";
+
 import type { Capital, CapitalInput } from "../../@api/types.gen.ts";
 import { BadRequestError } from "../_core/errors.ts";
 

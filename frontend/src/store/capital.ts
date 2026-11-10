@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------
 
 import { create } from "zustand";
+
 import type { Capital, CapitalInput } from "../../@api/types.gen.ts";
 import * as api from "../api/capital.ts";
 
