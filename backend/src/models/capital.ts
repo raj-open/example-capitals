@@ -8,8 +8,6 @@
 // IMPORTS
 // ----------------------------------------------------------------
 
-import type { ObjectId } from "mongodb";
-
 import type { Capital, CapitalInput } from "../../@api/types.gen.ts";
 import { BadRequestError } from "../_core/errors.ts";
 
@@ -19,8 +17,12 @@ import { BadRequestError } from "../_core/errors.ts";
 
 export type { Capital, CapitalInput };
 
+/**
+ * `_id` is derived from country and name on creation (see /backend/src/_core/ids.ts)
+ * and never changes afterwards, not even when country or name are edited.
+ */
 export interface CapitalDocument extends CapitalInput {
-    _id: ObjectId;
+    _id: string;
 }
 
 // ----------------------------------------------------------------
@@ -28,7 +30,7 @@ export interface CapitalDocument extends CapitalInput {
 // ----------------------------------------------------------------
 
 export function toCapital({ _id, ...rest }: CapitalDocument): Capital {
-    return { id: _id.toHexString(), ...rest };
+    return { id: _id, ...rest };
 }
 
 /**
