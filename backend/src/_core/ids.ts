@@ -9,6 +9,8 @@
 
 import { createHash } from "node:crypto";
 
+import { LOCALE } from "./locale.ts";
+
 // ----------------------------------------------------------------
 // LOCAL CONSTANTS
 // ----------------------------------------------------------------
@@ -98,5 +100,5 @@ function group(text: string): string {
 }
 
 function normalise(text: string): string {
-    return text.normalize("NFC").trim().toLocaleLowerCase("en");
+    return text.normalize("NFC").trim().toLocaleLowerCase(LOCALE);
 }

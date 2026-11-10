@@ -10,7 +10,7 @@ import { connect } from "./db/client.ts";
 
 import { settings } from "./_core/settings.ts";
 import { createApp } from "./app.ts";
-import { importAll } from "./services/countries.ts";
+import { importOnStart } from "./services/countries.ts";
 
 // ----------------------------------------------------------------
 // MAIN
@@ -19,7 +19,7 @@ import { importAll } from "./services/countries.ts";
 await connect();
 
 try {
-    const count = await importAll();
+    const count = await importOnStart();
     console.log(`imported ${count} capitals`);
 } catch (err) {
     console.error("import failed:", err);

@@ -1,9 +1,57 @@
+/*
+ * Colour mode: light or dark, via `data-mode` on <html> (set by App, following the light preset of the map).
+ */
+
+:root {
+    color-scheme: light;
+    --bg: #fafafa;
+    --surface: rgb(255 255 255 / 92%);
+    --subtle: #eee;
+    --border: #ddd;
+    --text: #222;
+    --muted: #777;
+    --accent: #1976d2;
+    --active: #ffe08a;
+    --selected: #e3f2fd;
+    --shadow: rgb(0 0 0 / 25%);
+}
+
+:root[data-mode="dark"] {
+    color-scheme: dark;
+    --bg: #15171c;
+    --surface: rgb(30 33 40 / 92%);
+    --subtle: #2a2e37;
+    --border: #2f333c;
+    --text: #d9dce3;
+    --muted: #8a8f9a;
+    --accent: #6ea8ff;
+    --active: #5a4b1e;
+    --selected: #1f3350;
+    --shadow: rgb(0 0 0 / 60%);
+}
+
 html,
 body,
 #root {
     height: 100%;
     margin: 0;
+    background: var(--bg);
+    color: var(--text);
     font-family: system-ui, sans-serif;
+}
+
+button,
+input {
+    color: inherit;
+}
+
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 .layout {
@@ -11,17 +59,549 @@ body,
     height: 100%;
 }
 
-.sidebar {
-    width: 320px;
-    overflow: auto;
-    padding: 1rem;
-    border-right: 1px solid #ddd;
+.error {
+    color: #e5484d;
 }
 
-.map {
+/* ---------------------------------------------------------------- */
+/* sidebar: fixed size relative to the window; header fixed, list scrolls; collapsible to a bar */
+/* ---------------------------------------------------------------- */
+
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    width: clamp(20rem, 30vw, 32rem);
+    height: 100vh;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.sidebar header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.75rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.sidebar h2 {
+    flex: 1;
+    margin: 0;
+}
+
+/* icon buttons (header, actions) */
+.sidebar-title button,
+.sidebar .actions button {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.sidebar-title button:hover,
+.sidebar .actions button:hover {
+    background: var(--subtle);
+    color: var(--text);
+}
+
+/* collapsed: a thin, full-height bar */
+.sidebar-handle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 1.75rem;
+    height: 100vh;
+    padding: 1rem 0;
+    border: none;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.sidebar-handle:hover {
+    background: var(--subtle);
+    color: var(--text);
+}
+
+.sidebar-handle span {
+    writing-mode: vertical-rl;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.sidebar-search {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.sidebar input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--subtle);
+    font: inherit;
+}
+
+.sidebar input:focus {
+    outline: 2px solid var(--accent);
+    border-color: transparent;
+}
+
+.sidebar small {
+    color: var(--muted);
+}
+
+.sidebar ul {
+    flex: 1;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.25rem 0;
+    list-style: none;
+    scroll-padding: 2rem 0;
+}
+
+.sidebar li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.3rem 0.5rem 0.3rem 1rem;
+    border-left: 3px solid transparent;
+}
+
+.sidebar li:hover {
+    background: var(--subtle);
+}
+
+.sidebar li.active {
+    background: var(--active);
+}
+
+.sidebar li.selected {
+    border-left-color: var(--accent);
+    background: var(--selected);
+}
+
+/* count and "Capitals only" in one row */
+.sidebar .sidebar-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* switch: capitals only */
+.sidebar .sidebar-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.sidebar .sidebar-switch input {
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+/* a little space between countries */
+.sidebar li.first:not(:first-child) {
+    margin-top: 0.4rem;
+}
+
+/* colour dot = marker colour; the colour input is hidden inside it */
+/* aligned with the first line of the entry */
+.sidebar .dot {
+    flex: none;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin-top: 0.3rem;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--border);
+    cursor: pointer;
+}
+
+.sidebar .dot input {
+    width: 0;
+    height: 0;
+    padding: 0;
+    border: none;
+    opacity: 0;
+}
+
+/* entry: [star] [country] [city / coordinates], aligned in columns */
+.sidebar .entry {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 1rem minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+    column-gap: 0.5rem;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sidebar .entry .mark {
+    padding-top: 0.15rem;
+    color: #f5b400;
+}
+
+.sidebar .entry .country {
+    overflow-wrap: anywhere;
+}
+
+.sidebar .entry .city {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.sidebar .entry .name {
+    color: var(--muted);
+}
+
+.sidebar .entry .coordinates {
+    overflow: hidden;
+    opacity: 0.7;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* actions: only visible on hover, focus or selection, so the list stays calm */
+.sidebar .actions {
+    display: flex;
+    visibility: hidden;
+}
+
+.sidebar li:hover .actions,
+.sidebar li:focus-within .actions,
+.sidebar li.selected .actions {
+    visibility: visible;
+}
+
+/* form (add, edit) */
+.capital-form {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.25rem 0;
+}
+
+.sidebar .capital-form input {
+    border-radius: 0.4rem;
+}
+
+.sidebar .capital-form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+}
+
+.sidebar .capital-form-check input {
+    width: auto;
+}
+
+.capital-form-row {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.capital-form-row > * {
     flex: 1;
 }
 
-.error {
-    color: #b00020;
+.sidebar .capital-form button {
+    padding: 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+}
+
+.sidebar .capital-form button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--bg);
+}
+
+.capital-form .error {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* map */
+/* ---------------------------------------------------------------- */
+
+.map {
+    position: relative;
+    flex: 1;
+}
+
+/* NOTE: two classes, as mapbox-gl.css (loaded later) sets `position: relative` on the map container */
+.map > .map-canvas {
+    position: absolute;
+    inset: 0;
+}
+
+/* flyby to another world: fade to black while travelling */
+.map > .map-canvas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+}
+
+.map > .map-canvas.travelling::after {
+    opacity: 1;
+}
+
+/* square marker per capital, as per brief (32px × 32px); smaller when zoomed out (--marker-size, set by MapView) */
+.marker {
+    --size: var(--marker-size, 32px);
+    width: var(--size);
+    height: var(--size);
+    box-sizing: border-box;
+    border: calc(var(--size) / 16) solid #fff;
+    box-shadow: 0 0 2px rgb(0 0 0 / 60%);
+    cursor: pointer;
+}
+
+.marker.selected {
+    border-color: #000;
+}
+
+/* capitals: a second, black border inside, set in by ~5% of the size (the gap in the marker's own colour) */
+.marker.capital {
+    --gap: calc(var(--size) * 0.05);
+    --line: max(1px, calc(var(--size) / 16));
+    box-shadow:
+        0 0 2px rgb(0 0 0 / 60%),
+        inset 0 0 0 var(--gap) currentColor,
+        inset 0 0 0 calc(var(--gap) + var(--line)) #000;
+}
+
+/* popup (mapbox-gl): colours of the mode; selectors raised above those of mapbox-gl.css */
+.map .mapboxgl-popup-content {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 2px 12px var(--shadow);
+}
+
+.map .mapboxgl-popup-close-button {
+    color: var(--muted);
+}
+
+.map [class*="mapboxgl-popup-anchor-top"] .mapboxgl-popup-tip {
+    border-bottom-color: var(--surface);
+}
+
+.map [class*="mapboxgl-popup-anchor-bottom"] .mapboxgl-popup-tip {
+    border-top-color: var(--surface);
+}
+
+.map .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+    border-right-color: var(--surface);
+}
+
+.map .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+    border-left-color: var(--surface);
+}
+
+.popup label {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* map controls: permanent round buttons (top right, stacked); each panel opens to the left of its button */
+/* ---------------------------------------------------------------- */
+
+.map-controls {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.map-panel {
+    position: relative;
+}
+
+.map-panel-toggle {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: 0 1px 4px var(--shadow);
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.map-panel-toggle svg {
+    transition: transform 0.2s ease;
+}
+
+.map-panel-toggle:hover,
+.map-panel-toggle[aria-expanded="true"] {
+    color: var(--accent);
+}
+
+.map-panel-toggle.spin[aria-expanded="true"] svg {
+    transform: rotate(45deg);
+}
+
+.map-panel-body {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 0.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 17rem;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: var(--surface);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 12px var(--shadow);
+    font-size: 0.8rem;
+}
+
+.map-panel-body fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.map-panel-body legend {
+    margin-bottom: 0.3rem;
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.map-settings-options {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 0.5rem;
+    background: var(--subtle);
+}
+
+.map-panel .map-settings-options button {
+    flex: 1;
+    padding: 0.3rem 0.4rem;
+    border: none;
+    border-radius: 0.4rem;
+    background: none;
+    font: inherit;
+    white-space: nowrap;
+    text-transform: capitalize;
+    cursor: pointer;
+}
+
+.map-panel .map-settings-options button[aria-pressed="true"] {
+    background: var(--bg);
+    box-shadow: 0 1px 2px var(--shadow);
+}
+
+/* data actions (own panel): 2 × 2 buttons, "Clear" in red */
+.map-panel .data-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+}
+
+.map-panel .data-actions button {
+    padding: 0.35rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--bg);
+    font: inherit;
+    cursor: pointer;
+}
+
+.map-panel .data-actions button:hover:not(:disabled) {
+    border-color: var(--accent);
+}
+
+.map-panel .data-actions button.danger {
+    color: #e5484d;
+}
+
+.map-panel .data-actions button:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+.map-panel .data-message {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--muted);
+}
+
+/* other worlds (easter egg): no cities on the map */
+.offworld .marker {
+    display: none;
+}
+
+.map-panel .map-settings-select {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--bg);
+    color: inherit;
+    font: inherit;
+}
+
+.map-panel .map-settings-credit {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--muted);
+    font-size: 0.7rem;
+}
+
+.map-panel-body fieldset:disabled {
+    opacity: 0.4;
 }

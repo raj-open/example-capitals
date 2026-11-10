@@ -27,6 +27,12 @@ export class BadRequestError extends HttpError {
     }
 }
 
+export class ForbiddenError extends HttpError {
+    constructor(message = "forbidden") {
+        super(403, message);
+    }
+}
+
 export class NotFoundError extends HttpError {
     constructor(message = "not found") {
         super(404, message);
@@ -36,6 +42,12 @@ export class NotFoundError extends HttpError {
 export class ConflictError extends HttpError {
     constructor(message = "conflict") {
         super(409, message);
+    }
+}
+
+export class UnavailableError extends HttpError {
+    constructor(message = "service unavailable") {
+        super(503, message);
     }
 }
 

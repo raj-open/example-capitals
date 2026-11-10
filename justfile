@@ -77,6 +77,12 @@ serve-db:
 stop-db:
     docker compose stop db
 
+# clear the database: remove its volume and start it again (/db/schema.js runs on the empty volume)
+[group('run')]
+clear-db:
+    -docker compose down --volumes
+    docker compose up -d db
+
 # run backend and frontend with hot reload
 [group('run')]
 dev: _deps
