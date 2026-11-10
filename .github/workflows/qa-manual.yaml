@@ -1,0 +1,136 @@
+# ----------------------------------------------------------------
+# QA (manual): on demand, for any branch, tag or commit;
+# optionally creates a draft release v<VERSION> (cf. /dist/VERSION)
+# ----------------------------------------------------------------
+
+name: QA (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: |-
+          Choice of environment for pipeline
+        # NOTE: this option provides dropdown list of choices of environments set on GitHub (enterprise only)
+        type: environment
+        required: true
+        default: "local"
+      release:
+        description: |-
+          Create a draft release v<VERSION> (after QA)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    name: QA
+    runs-on: "ubuntu-26.04"
+    environment: "${{ github.event.inputs.environment }}"
+    timeout-minutes: 30
+    steps:
+      # --------------------------------
+      # Setup
+      # --------------------------------
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: extractions/setup-just@v4
+
+      - name: Setup
+        run: |-
+          # NOTE: variables and secrets of the GitHub environment, else of the repository
+          cat <<'EOF' > .env
+          DOCKER_PROJECT="${{ vars.DOCKER_PROJECT }}"
+          PORT=${{ vars.PORT }}
+          DATABASE_HOST="${{ vars.DATABASE_HOST }}"
+          DATABASE_PORT=${{ vars.DATABASE_PORT }}
+          DATABASE_NAME="${{ vars.DATABASE_NAME }}"
+          DATABASE_USER="${{ vars.DATABASE_USER }}"
+          DATABASE_PASSWORD="${{ secrets.DATABASE_PASSWORD }}"
+          RESTCOUNTRIES_URL="${{ vars.RESTCOUNTRIES_URL }}"
+          RESTCOUNTRIES_API_KEY="${{ secrets.RESTCOUNTRIES_API_KEY }}"
+          VITE_MAPBOX_TOKEN="${{ secrets.VITE_MAPBOX_TOKEN }}"
+          EOF
+
+      - name: Build dependencies
+        run: |-
+          just build
+
+      - name: Start database
+        run: |-
+          just serve-db
+          # first start runs /db/schema.js, then restarts: wait until it answers
+          for i in $(seq 1 30); do
+            docker compose exec -T db mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' && break
+            sleep 2
+          done
+
+      # --------------------------------
+      # Checks
+      # --------------------------------
+
+      - name: QA - Linting
+        run: |-
+          just lint-check
+
+      - name: QA - Unit Tests
+        run: |-
+          just tests-unit
+
+      - name: QA - Behavioural Tests
+        run: |-
+          just tests-behave
+
+      - name: QA - Integration Tests
+        run: |-
+          just tests-integration
+
+  release:
+    name: Release
+    needs: qa
+    if: ${{ inputs.release }}
+    runs-on: "ubuntu-26.04"
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      # --------------------------------
+      # Setup
+      # --------------------------------
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Read version
+        id: version
+        run: |-
+          echo "value=$(cat dist/VERSION)" >> "$GITHUB_OUTPUT"
+
+      # --------------------------------
+      # Release
+      # --------------------------------
+
+      # NOTE: draft only; release notes are written and the release published separately
+      - name: Create draft release
+        uses: softprops/action-gh-release@v3.0.3
+        with:
+          tag_name: "v${{ steps.version.outputs.value }}"
+          target_commitish: ${{ github.sha }}
+          draft: true
+          prerelease: ${{ contains(steps.version.outputs.value, '-') }}
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

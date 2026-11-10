@@ -1,0 +1,111 @@
+# ----------------------------------------------------------------
+# QA (automatic): on every pull request
+# ----------------------------------------------------------------
+
+name: QA (automatic)
+
+on:
+  # NOTE: resort to manual execution instead of run-on-push
+  # push:
+  #   branches:
+  #     - main
+  #     - staging
+
+  pull_request:
+    branches:
+      - main
+      - staging
+      - 'dev-*'
+      - 'bugfix-*'
+      - 'hotfix-*'
+      - 'feat-*'
+      - 'feature-*'
+      - 'story-*'
+
+    paths:
+      - '**/*'
+
+    # see <https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#discussion>
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - unlocked
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-auto-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    name: QA
+    runs-on: "ubuntu-26.04"
+    environment: "local"
+    timeout-minutes: 30
+    steps:
+      # --------------------------------
+      # Setup
+      # --------------------------------
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: extractions/setup-just@v4
+
+      - name: Setup
+        run: |-
+          # NOTE: variables and secrets of the GitHub environment, else of the repository
+          cat <<'EOF' > .env
+          DOCKER_PROJECT="${{ vars.DOCKER_PROJECT }}"
+          PORT=${{ vars.PORT }}
+          DATABASE_HOST="${{ vars.DATABASE_HOST }}"
+          DATABASE_PORT=${{ vars.DATABASE_PORT }}
+          DATABASE_NAME="${{ vars.DATABASE_NAME }}"
+          DATABASE_USER="${{ vars.DATABASE_USER }}"
+          DATABASE_PASSWORD="${{ secrets.DATABASE_PASSWORD }}"
+          RESTCOUNTRIES_URL="${{ vars.RESTCOUNTRIES_URL }}"
+          RESTCOUNTRIES_API_KEY="${{ secrets.RESTCOUNTRIES_API_KEY }}"
+          VITE_MAPBOX_TOKEN="${{ secrets.VITE_MAPBOX_TOKEN }}"
+          EOF
+
+      - name: Build dependencies
+        run: |-
+          just build
+
+      - name: Start database
+        run: |-
+          just serve-db
+          # first start runs /db/schema.js, then restarts: wait until it answers
+          for i in $(seq 1 30); do
+            docker compose exec -T db mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' && break
+            sleep 2
+          done
+
+      # --------------------------------
+      # Checks
+      # --------------------------------
+
+      - name: QA - Linting
+        run: |-
+          just lint-check
+
+      - name: QA - Unit Tests
+        run: |-
+          just tests-unit
+
+      - name: QA - Behavioural Tests
+        run: |-
+          just tests-behave
+
+      - name: QA - Integration Tests
+        run: |-
+          just tests-integration
