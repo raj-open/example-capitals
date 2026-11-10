@@ -1,0 +1,27 @@
+html,
+body,
+#root {
+    height: 100%;
+    margin: 0;
+    font-family: system-ui, sans-serif;
+}
+
+.layout {
+    display: flex;
+    height: 100%;
+}
+
+.sidebar {
+    width: 320px;
+    overflow: auto;
+    padding: 1rem;
+    border-right: 1px solid #ddd;
+}
+
+.map {
+    flex: 1;
+}
+
+.error {
+    color: #b00020;
+}
