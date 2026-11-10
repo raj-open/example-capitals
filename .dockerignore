@@ -1,0 +1,54 @@
+# NOTE: docker semantics differ from git:
+# `!/dir` re-includes the whole folder, so only file patterns are listed here,
+# and docker walks into excluded folders by itself (no `!/dir/**/` needed).
+# Only this file is read (root of the build context).
+
+/**
+
+# ----------------------------------------------------------------
+# ROOT
+# ----------------------------------------------------------------
+
+!/justfile
+!/package.json
+!/package-lock.json
+!/tsconfig.base.json
+!/biome.json
+
+# ----------------------------------------------------------------
+# PROJECT
+# ----------------------------------------------------------------
+
+!/templates/template*
+
+!/backend/package.json
+!/backend/tsconfig.json
+!/backend/src/**/*.ts
+!/backend/tests/**/*.ts
+
+!/frontend/package.json
+!/frontend/tsconfig.json
+!/frontend/vite.config.ts
+!/frontend/index.html
+!/frontend/src/**/*.ts
+!/frontend/src/**/*.tsx
+!/frontend/src/**/*.css
+!/frontend/tests/**/*.ts
+
+!/db/*.js
+
+!/models/*.yaml
+
+!/tests/tsconfig.json
+!/tests/**/*.ts
+!/tests/**/*.feature
+
+!/dist/VERSION
+
+# ----------------------------------------------------------------
+# FORCE REMOVE
+# ----------------------------------------------------------------
+
+**/.DS_Store
+**/__archive__*
+**/node_modules

@@ -1,0 +1,5 @@
+# Forces (staged) text files (i.e. nonbinaries) to be saved with LF instead of CRLF-endings
+# * text=auto
+
+# Forces text files (i.e. nonbinaries) both remotely and locally to be saved with LF
+* text eol=lf

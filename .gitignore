@@ -1,0 +1,67 @@
+/**
+!/.gitattributes
+!/.gitignore
+!/.dockerignore
+
+# ----------------------------------------------------------------
+# ROOT
+# ----------------------------------------------------------------
+
+!/README.md
+!/LICENCE
+!/justfile
+!/tsconfig.base.json
+!/package-lock.json
+!/package.json
+!/biome.json
+# for docker
+!/docker-compose.yaml
+# for git workflows
+!/.github
+!/.github/workflows
+!/.github/workflows/*.yaml
+# demos (screenshots, hero image)
+!/demos
+!/demos/**
+
+# ----------------------------------------------------------------
+# PROJECT
+# ----------------------------------------------------------------
+
+!/templates
+!/templates/template*
+
+!/frontend
+!/backend
+
+!/db
+!/db/*.js
+
+!/models
+!/models/*.yaml
+
+!/tests
+!/tests/**/
+!/tests/**/*.ts
+!/tests/**/*.feature
+!/tests/tsconfig.json
+
+!/dist
+!/dist/VERSION
+
+# ----------------------------------------------------------------
+# FORCE REMOVE
+# ----------------------------------------------------------------
+
+**/.vscode
+**/*.tmp
+**/.DS_Store
+**/__archive__*
+**/node_modules
+**/.cache
+
+# ----------------------------------------------------------------
+# FORCE RETAIN
+# ----------------------------------------------------------------
+
+!**/.gitkeep
