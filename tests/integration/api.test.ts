@@ -9,8 +9,10 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createApp } from "../../backend/src/app.ts";
+
 import { close, connect } from "../../backend/src/db/client.ts";
+
+import { createApp } from "../../backend/src/app.ts";
 
 // ----------------------------------------------------------------
 // LOCAL VARIABLES

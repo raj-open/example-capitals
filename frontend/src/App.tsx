@@ -3,6 +3,7 @@
 // ----------------------------------------------------------------
 
 import { lazy, Suspense, useEffect } from "react";
+
 import { CapitalList } from "./components/CapitalList.tsx";
 import { useCapitals } from "./store/capital.ts";
 

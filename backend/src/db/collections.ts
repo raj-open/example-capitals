@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------
 
 import type { Collection } from "mongodb";
+
 import type { CapitalDocument } from "../models/capital.ts";
 import { db } from "./client.ts";
 
