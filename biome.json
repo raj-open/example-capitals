@@ -42,7 +42,29 @@
   "assist": {
     "actions": {
       "source": {
-        "organizeImports": "on"
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              [
+                ":NODE:",
+                ":BUN:",
+                ":PACKAGE:",
+                ":PACKAGE_WITH_PROTOCOL:",
+                ":URL:"
+              ],
+              ":BLANK_LINE:",
+              [
+                "**/db/**"
+              ],
+              ":BLANK_LINE:",
+              [
+                ":ALIAS:",
+                ":PATH:"
+              ]
+            ]
+          }
+        }
       }
     }
   }

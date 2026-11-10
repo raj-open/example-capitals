@@ -1,6 +1,6 @@
 {
   "name": "example-capitals",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "react frontend + REST api backend + DB",
   "private": true,
   "type": "module",

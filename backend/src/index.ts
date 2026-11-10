@@ -6,10 +6,11 @@
 // IMPORTS
 // ----------------------------------------------------------------
 
+import { connect } from "./db/client.ts";
+
 import { settings } from "./_core/settings.ts";
 import { createApp } from "./app.ts";
-import { connect } from "./db/client.ts";
-import { importAll } from "./services/restcountries.ts";
+import { importAll } from "./services/countries.ts";
 
 // ----------------------------------------------------------------
 // MAIN
