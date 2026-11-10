@@ -126,6 +126,11 @@ components:
           properties:
             id:
               type: string
+              description: >-
+                derived from country and name on creation
+                (UUIDv5 as 22 base62 characters in groups, e.g. `1aB2cD3-eF4gH5i-J6kL7mN8`);
+                does not change when they are edited
+              pattern: "^[0-9A-Za-z]{7}-[0-9A-Za-z]{7}-[0-9A-Za-z]{8}$"
 
     Error:
       type: object

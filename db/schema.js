@@ -20,7 +20,8 @@ target.createCollection("capitals", {
             required: ["name", "country", "latitude", "longitude"],
             additionalProperties: false,
             properties: {
-                _id: { bsonType: "objectId" },
+                // id derived from country + name: UUIDv5 as 22 base62 characters in groups (see /backend/src/_core/ids.ts)
+                _id: { bsonType: "string", pattern: "^[0-9A-Za-z]{7}-[0-9A-Za-z]{7}-[0-9A-Za-z]{8}$" },
                 name: { bsonType: "string", minLength: 1 },
                 country: { bsonType: "string", minLength: 1 },
                 latitude: { bsonType: ["double", "int"], minimum: -90, maximum: 90 },
