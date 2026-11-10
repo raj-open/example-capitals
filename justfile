@@ -138,6 +138,16 @@ tests-e2e: _deps
     npx --no -- playwright test --config tests/e2e/playwright.config.ts
 
 # ----------------------------------------------------------------
+# DOCS
+# ----------------------------------------------------------------
+
+# screenshots for /demos (WebP) and the social preview of the repo (UI + API + DB); needs `just serve-db` and capitals in the DB
+[group('docs')]
+demos: _deps
+    npx --no -- playwright install chromium
+    npx --no -- playwright test --config tests/demos/playwright.config.ts
+
+# ----------------------------------------------------------------
 # QUALITY
 # ----------------------------------------------------------------
 

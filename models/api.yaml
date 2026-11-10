@@ -10,16 +10,19 @@ paths:
       summary: liveness incl. DB ping
       responses:
         "200":
-          description: ok
+          description: API and database up
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: database unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
 
-  # /capital: capitals only (as in the brief); a city with `capital: false` is rejected with 400 (use /city)
+  # /capital: capitals only; a city with `capital: false` is rejected with 400 (use /city)
   # /city: all cities; same shape and operations
   /capital:
     get:
@@ -211,6 +214,13 @@ paths:
 
 components:
   schemas:
+    Health:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
     CapitalInput:
       description: >-
         a city of a country; unique per (country, name), case-insensitive;

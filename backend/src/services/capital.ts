@@ -1,6 +1,6 @@
 /**
  * Business logic for cities, in a scope:
- * all cities (/city) or capitals only (/capital, as in the brief).
+ * all cities (/city) or capitals only (/capital).
  */
 
 // ----------------------------------------------------------------

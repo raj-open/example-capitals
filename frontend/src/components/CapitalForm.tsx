@@ -1,6 +1,8 @@
 /**
  * Inline form to add or edit a capital (in the sidebar).
  *
+ * The colour of the marker can be set here, too (as in the popup); unchanged, the city keeps its colour (or the default).
+ *
  * Latitude and longitude are text fields (decimal keypad on phones), shown in the number format of the user;
  * native number fields would follow the browser instead. Both `.` and `,` are accepted as decimal mark.
  */
@@ -12,6 +14,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import type { CapitalInput } from "../../@api/types.gen.ts";
+import { DEFAULT_COLOUR } from "../store/capital.ts";
 import { useSettings } from "../store/settings.ts";
 import { formatNumber, LOCALES, parseNumber } from "../utils/locale.ts";
 
@@ -46,6 +49,7 @@ export function CapitalForm({
     );
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const [capital, setCapital] = useState(initial?.capital ?? true);
+    const [colour, setColour] = useState(initial?.colour);
     const [error, setError] = useState<string>();
     const [busy, setBusy] = useState(false);
     const first = useRef<HTMLInputElement>(null);
@@ -81,6 +85,7 @@ export function CapitalForm({
                 longitude,
                 // in capitals mode (/capital), every city is a capital
                 capital: capitalsOnly || capital,
+                ...(colour && { colour }),
             });
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
@@ -116,12 +121,26 @@ export function CapitalForm({
                     {...field("longitude")}
                 />
             </div>
-            {!capitalsOnly && (
-                <label className="capital-form-check">
-                    <input type="checkbox" checked={capital} onChange={(event) => setCapital(event.target.checked)} />
-                    Capital of the country
+            <div className="capital-form-options">
+                {!capitalsOnly && (
+                    <label className="capital-form-check">
+                        <input
+                            type="checkbox"
+                            checked={capital}
+                            onChange={(event) => setCapital(event.target.checked)}
+                        />
+                        Capital of the country
+                    </label>
+                )}
+                <label className="capital-form-colour">
+                    Colour
+                    <input
+                        type="color"
+                        value={colour ?? DEFAULT_COLOUR}
+                        onChange={(event) => setColour(event.target.value)}
+                    />
                 </label>
-            )}
+            </div>
             {error && <p className="error">{error}</p>}
             <div className="capital-form-row">
                 <button type="button" onClick={onCancel}>

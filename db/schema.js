@@ -35,8 +35,7 @@ target.createCollection("capitals", {
 });
 
 // unique per (country, name): several cities per country and the same name in several countries are allowed
-// NOTE: deviates from the brief (`name` and `country` each unique), see /specs-private.md
 target.capitals.createIndex({ country: 1, name: 1 }, { unique: true });
 
-// at most one capital per country (so with only capitals, `country` is unique as in the brief)
+// at most one capital per country (so among capitals, `country` is unique)
 target.capitals.createIndex({ country: 1 }, { unique: true, partialFilterExpression: { capital: true } });

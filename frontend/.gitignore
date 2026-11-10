@@ -15,6 +15,9 @@
 # ----------------------------------------------------------------
 
 !/index.html
+!/assets
+!/assets/favicon.svg
+!/assets/apple-touch-icon.png
 !/src
 !/src/**/
 !/src/**/*.css
