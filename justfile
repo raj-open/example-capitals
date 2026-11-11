@@ -15,6 +15,9 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # explicit paths, so biome never scans local-only folders (which may contain other biome configs)
 lint_paths := "backend frontend tests db templates package.json tsconfig.base.json biome.json"
 
+# the backend (for the data recipes)
+api := "http://localhost:" + env("PORT", "3001")
+
 # ----------------------------------------------------------------
 # MENU
 # ----------------------------------------------------------------
@@ -50,7 +53,8 @@ models: _deps
 upgrade:
     npm update
 
-# follow the lock file; rewrite it only if a manifest changed
+# follow the lock file; rewrite it only if a manifest changed;
+# reinstall if an install did not finish (npm writes node_modules/.package-lock.json last) or the lock file changed
 _deps:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -59,7 +63,8 @@ _deps:
         || [ backend/package.json -nt package-lock.json ] \
         || [ frontend/package.json -nt package-lock.json ]; then
         npm install
-    elif [ ! -d node_modules ]; then
+    elif [ ! -f node_modules/.package-lock.json ] \
+        || [ package-lock.json -nt node_modules/.package-lock.json ]; then
         npm ci
     fi
 
@@ -97,6 +102,33 @@ dev-backend:
 [group('run')]
 dev-frontend:
     npx --no -- vite --config frontend/vite.config.ts frontend
+
+# ----------------------------------------------------------------
+# DATA (via the running backend, as the settings panel; 403 with DATA_ACTIONS=false)
+# ----------------------------------------------------------------
+
+# remove all cities (the DB itself stays, unlike `just clear-db`)
+[group('data')]
+data-clear:
+    @just _data DELETE /data
+
+# add the example cities (existing ones are skipped)
+[group('data')]
+data-examples:
+    @just _data POST /data/examples
+
+# import all capitals from REST Countries (costs requests of the monthly quota)
+[group('data')]
+data-capitals:
+    @just _data POST /data/capitals
+
+# add the large sample of ordinary cities (existing ones are skipped)
+[group('data')]
+data-cities:
+    @just _data POST /data/cities
+
+_data method path:
+    curl --silent --show-error --fail-with-body -X "$1" "{{api}}$2" && echo
 
 # ----------------------------------------------------------------
 # BUILD
