@@ -3,7 +3,7 @@
  * a spot (a clicked point, or a place label of the map) is matched against known places
  * (stored cities and the Natural Earth sample), so it can be added with name, country and exact coordinates.
  *
- * - a label (has a name): the known place of the same name nearby (for its country), otherwise the label alone
+ * - a label (has a name): the known place of the same name nearby, otherwise the label alone (with what it knows)
  * - a point: the nearest known place nearby, otherwise the point alone
  *
  * "Nearby" is measured in pixels on the screen (via `project`), so it follows the zoom.
@@ -33,6 +33,7 @@ export interface Place {
     country: string;
     latitude: number;
     longitude: number;
+    capital?: boolean;
 }
 
 /** a spot on the map, or what it snapped to */
@@ -58,7 +59,7 @@ export function snap(spot: Spot, places: Place[], project: Project, radius = RAD
     const name = spot.name;
     const match = near.find((place) => same(place.name, name));
 
-    return match ?? { name, ...point(spot) };
+    return match ?? { ...spot, ...point(spot) };
 }
 
 // ----------------------------------------------------------------

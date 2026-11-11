@@ -31,6 +31,7 @@ import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
 import type { View } from "../store/view.ts";
 import { useView } from "../store/view.ts";
+import { countryName } from "../utils/countries.ts";
 import { markerSize } from "../utils/markers.ts";
 import type { Spot } from "../utils/snap.ts";
 import { point, snap } from "../utils/snap.ts";
@@ -56,6 +57,9 @@ const SLOP = 10;
 
 /** the place labels of Mapbox Standard */
 const LABELS = { featuresetId: "place-labels", importId: "basemap" };
+
+/** `capital` of a place label (Mapbox Streets tileset) for the capital of a country */
+const NATIONAL_CAPITAL = 2;
 
 /** classes of place labels which are not cities (as in the Mapbox Streets tileset) */
 const NOT_CITIES = new Set(["country", "disputed_country", "state", "disputed_state", "settlement_subdivision"]);
@@ -104,6 +108,8 @@ export function MapView() {
         map.current = new mapboxgl.Map({
             container: element.current,
             style: styleOf(useMapStyle.getState()),
+            // labels (and so the names of cities added from them) in English, not in the local script
+            language: "en",
             ...(body === "earth" ? viewOf(useView.getState()) : {}),
         });
 
@@ -513,17 +519,37 @@ function show(map: mapboxgl.Map, popup: mapboxgl.Popup, selected: Capital | unde
 function spotAt(map: mapboxgl.Map, at: mapboxgl.Point): Spot | undefined {
     const { items } = useCapitals.getState();
     const project = ({ longitude, latitude }: Spot) => map.project([longitude, latitude]);
+    const known = places(items);
     const label = map.queryRenderedFeatures(at, { target: LABELS }).find(isCity);
     const { lng, lat } = map.unproject(at);
     let spot: Spot = { latitude: lat, longitude: lng };
 
     if (label?.geometry.type === "Point") {
         const [longitude, latitude] = label.geometry.coordinates;
-        spot = { name: String(label.properties?.name), latitude, longitude };
+        const { iso_3166_1: code, capital } = tileProperties(label);
+
+        spot = {
+            name: String(label.properties?.name),
+            latitude,
+            longitude,
+            country:
+                typeof code === "string" ? countryName(code, new Set(known.map(({ country }) => country))) : undefined,
+            capital: capital === NATIONAL_CAPITAL,
+        };
     }
 
-    const result = snap(spot, places(items), project);
+    const result = snap(spot, known, project);
     return result.name === undefined ? undefined : result;
+}
+
+/**
+ * All properties of a place label in its tile (the featureset only offers `name` and `class`),
+ * e.g. `iso_3166_1` (country code) and `capital` (2: of a country), as in the Mapbox Streets tileset.
+ * NOTE: `_vectorTileFeature` is internal to mapbox-gl; without it, the label only gives its name
+ */
+function tileProperties(feature: object): { [key: string]: unknown } {
+    const tile = (feature as { _vectorTileFeature?: { properties?: { [key: string]: unknown } } })._vectorTileFeature;
+    return tile?.properties ?? {};
 }
 
 /**

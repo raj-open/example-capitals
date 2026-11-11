@@ -838,6 +838,16 @@ input {
     gap: 0.3rem;
 }
 
+/* as in the form (not a round search field) */
+.sidebar .selection-bar input[type="color"] {
+    width: 2.25rem;
+    height: 1.5rem;
+    padding: 0.1rem;
+    border-radius: 0.4rem;
+    background: none;
+    cursor: pointer;
+}
+
 .sidebar .selection-bar button {
     padding: 0.2rem 0.5rem;
     border: 1px solid var(--border);

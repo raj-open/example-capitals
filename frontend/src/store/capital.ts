@@ -110,7 +110,13 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
 
         const { selection, anchor } = get();
         const next = selecting(selection, anchor, id, how, order);
-        set({ selection: next, anchor: how === "range" ? (anchor ?? id) : id });
+
+        // selecting drops a city proposed on the map (and its form to add), silently
+        set((state) => ({
+            selection: next,
+            anchor: how === "range" ? (anchor ?? id) : id,
+            ...dropDraft(state),
+        }));
 
         if (!next.includes(id)) {
             set((state) => ({ selected: state.selected?.id === id ? undefined : state.selected }));
@@ -133,7 +139,7 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
      * Selects several cities at once (e.g. all matches of a search), without focus.
      */
     selectAll: (ids) => {
-        set({ selection: [...ids], anchor: ids[0], selected: undefined });
+        set((state) => ({ selection: [...ids], anchor: ids[0], selected: undefined, ...dropDraft(state) }));
     },
 
     /**
@@ -317,6 +323,13 @@ export function selectingOf({
  */
 function resource(): Resource {
     return useSettings.getState().capitalsOnly ? "capital" : "city";
+}
+
+/**
+ * Without the city proposed on the map, and without its form to add (if open).
+ */
+function dropDraft({ editing }: CapitalState): Partial<CapitalState> {
+    return { draft: undefined, editing: editing === NEW ? undefined : editing };
 }
 
 /**

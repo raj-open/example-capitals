@@ -236,6 +236,17 @@ describe("useCapitals", () => {
             expect(useCapitals.getState().selection).toEqual([]);
         });
 
+        it("drops a city proposed on the map (and its form) when selecting, silently", async () => {
+            useCapitals.getState().propose({ latitude: 0, longitude: 0 });
+            await useCapitals.getState().select("a");
+            expect(useCapitals.getState().draft).toBeUndefined();
+            expect(useCapitals.getState().editing).toBeUndefined();
+
+            useCapitals.getState().propose({ latitude: 0, longitude: 0 });
+            useCapitals.getState().selectAll(["a"]);
+            expect(useCapitals.getState().draft).toBeUndefined();
+        });
+
         it("selects all given, without focus", () => {
             useCapitals.getState().selectAll(["a", "c"]);
             expect(useCapitals.getState().selection).toEqual(["a", "c"]);
