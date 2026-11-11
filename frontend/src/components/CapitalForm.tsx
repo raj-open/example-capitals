@@ -1,5 +1,7 @@
 /**
  * Inline form to add or edit a capital (in the sidebar).
+ * To add, it may come prefilled (a city proposed on the map), with any fields;
+ * if it says whether the city is a capital, the choice is offered even with "Capitals only".
  *
  * The colour of the marker can be set here, too (as in the popup); unchanged, the city keeps its colour (or the default).
  *
@@ -16,6 +18,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { CapitalInput } from "../../@api/types.gen.ts";
 import { DEFAULT_COLOUR } from "../store/capital.ts";
 import { useSettings } from "../store/settings.ts";
+import type { Locale } from "../utils/locale.ts";
 import { formatNumber, LOCALES, parseNumber } from "../utils/locale.ts";
 
 // ----------------------------------------------------------------
@@ -30,23 +33,17 @@ const EMPTY = { country: "", name: "", latitude: "", longitude: "" };
 
 export function CapitalForm({
     initial,
+    action,
     onSubmit,
     onCancel,
 }: {
-    initial?: CapitalInput;
+    initial?: Partial<CapitalInput>;
+    action: "Add" | "Save";
     onSubmit: (input: CapitalInput) => Promise<unknown>;
     onCancel: () => void;
 }) {
     const locale = useSettings((state) => state.locale);
-    const [fields, setFields] = useState(
-        initial
-            ? {
-                  ...initial,
-                  latitude: formatNumber(initial.latitude, locale),
-                  longitude: formatNumber(initial.longitude, locale),
-              }
-            : EMPTY,
-    );
+    const [fields, setFields] = useState(() => text(initial, locale));
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const [capital, setCapital] = useState(initial?.capital ?? true);
     const [colour, setColour] = useState(initial?.colour);
@@ -83,8 +80,7 @@ export function CapitalForm({
                 name: fields.name.trim(),
                 latitude,
                 longitude,
-                // in capitals mode (/capital), every city is a capital
-                capital: capitalsOnly || capital,
+                capital,
                 ...(colour && { colour }),
             });
         } catch (err) {
@@ -122,7 +118,7 @@ export function CapitalForm({
                 />
             </div>
             <div className="capital-form-options">
-                {!capitalsOnly && (
+                {(!capitalsOnly || initial?.capital === false) && (
                     <label className="capital-form-check">
                         <input
                             type="checkbox"
@@ -147,9 +143,27 @@ export function CapitalForm({
                     Cancel
                 </button>
                 <button type="submit" className="primary" disabled={busy}>
-                    {initial ? "Save" : "Add"}
+                    {action}
                 </button>
             </div>
         </form>
     );
+}
+
+// ----------------------------------------------------------------
+// AUXILIARY METHODS
+// ----------------------------------------------------------------
+
+/**
+ * The text fields of the form (missing values stay empty).
+ */
+function text(initial: Partial<CapitalInput> | undefined, locale: Locale): typeof EMPTY {
+    const number = (value?: number) => (value === undefined ? "" : formatNumber(value, locale));
+
+    return {
+        country: initial?.country ?? "",
+        name: initial?.name ?? "",
+        latitude: number(initial?.latitude),
+        longitude: number(initial?.longitude),
+    };
 }

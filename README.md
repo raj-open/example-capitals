@@ -52,6 +52,16 @@ just dev        # UI on http://localhost:5173, API on http://localhost:${PORT} (
 
 `PORT` and `DATABASE_PORT` are the values from `.env` (3001 and 27017 in [the template](templates/template.env)).
 
+Data, while `just dev` runs (as in the settings panel of the map):
+
+```bash
+just data-clear      # removes all cities
+just data-examples   # adds the example cities
+just data-capitals   # imports all capitals from REST Countries (costs requests of the monthly quota)
+just data-cities     # adds a large sample of ordinary cities
+just clear-db        # recreates the database itself (needed when db/schema.js changes)
+```
+
 When done:
 
 ```bash
@@ -147,7 +157,7 @@ curl -s -X DELETE localhost:3001/capital/<id>
 
 ## Data ##
 
-On startup, the backend imports all countries and their capitals from [REST Countries](https://restcountries.com) v5 (`country` = common name, `name` = first capital). The import is skipped if capitals are already stored, so restarts do not use up the monthly quota; set `RESTCOUNTRIES_REFRESH=true` in `.env` to import again. `RESTCOUNTRIES_POPULATION_MIN` and `RESTCOUNTRIES_TOP` narrow the selection by population.
+On startup, the backend only adds the example cities, and only to an empty database. All countries and their capitals are imported from [REST Countries](https://restcountries.com) v5 (`country` = common name, `name` = first capital) on request: via the data panel of the map or `just data-capitals` (each import costs requests of the monthly quota). `RESTCOUNTRIES_POPULATION_MIN` and `RESTCOUNTRIES_TOP` narrow the selection by population.
 
 The data panel on the map (and the endpoints below) clears and fills the database, for tests and demos. Set `DATA_ACTIONS=false` where data must be kept.
 

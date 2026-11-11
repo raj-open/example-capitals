@@ -59,26 +59,6 @@ const FIELDS = ["names.common", "capitals", "population", "region"].join(",");
 // ----------------------------------------------------------------
 
 /**
- * Import on start: skipped without an API key, or if cities are stored already (unless `refresh` is set).
- * Returns the number of capitals stored.
- */
-export async function importOnStart(): Promise<number> {
-    const { key, refresh } = settings.restcountries;
-
-    if (!key) {
-        console.warn("RESTCOUNTRIES_API_KEY not set: skipped import");
-        return 0;
-    }
-
-    if (!refresh && (await capitals().estimatedDocumentCount()) > 0) {
-        console.log("cities already stored: skipped import (set RESTCOUNTRIES_REFRESH=true to re-import)");
-        return 0;
-    }
-
-    return importCapitals();
-}
-
-/**
  * Fetches all countries and upserts the capitals of the selection (by country and name, so it is idempotent).
  * Costs ⌈total / limit⌉ requests of the monthly quota. Returns the number of capitals stored.
  */
@@ -159,7 +139,7 @@ async function upsert(items: CapitalData[]): Promise<number> {
         return 0;
     }
 
-    // the colour (by region) only for new cities, so colours chosen by the user survive a refresh
+    // the colour (by region) only for new cities, so colours chosen by the user survive a re-import
     const operations = items.map(({ colour, ...item }) => ({
         updateOne: {
             filter: { country: item.country, name: item.name },

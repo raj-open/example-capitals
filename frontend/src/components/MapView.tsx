@@ -4,8 +4,15 @@
  *
  * Clicking a marker selects its capital (GET /capital/{name});
  * the map then flies to the selected capital and opens a popup to change the colour of its marker.
+ * On Earth, a city can be proposed to add: over a city (a place label of the map or a known place,
+ * see /frontend/src/utils/snap.ts) the cursor is a crosshair with a hint, and a click adds it;
+ * anywhere, right-click or long-press opens a menu "Add a city here" (the point itself);
+ * a pin marks the spot and the form in the sidebar opens, prefilled;
+ * a stored city (its marker, or next to it: hint "Edit …") is selected and opened in the sidebar to edit instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
+ * Limited to some countries (see the list), only their markers are shown and the map fits them.
+ * The view on Earth is remembered (see /frontend/src/store/view.ts): a reload, or a return from another world, keeps it.
  */
 
 // ----------------------------------------------------------------
@@ -14,14 +21,20 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 import mapboxgl from "mapbox-gl";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import type { Capital } from "../../@api/types.gen.ts";
-import { DEFAULT_COLOUR, useCapitals } from "../store/capital.ts";
+import { places } from "../data/places.ts";
+import { DEFAULT_COLOUR, selectingOf, useCapitals, visible } from "../store/capital.ts";
 import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
+import type { View } from "../store/view.ts";
+import { useView } from "../store/view.ts";
+import { countryName } from "../utils/countries.ts";
 import { markerSize } from "../utils/markers.ts";
+import type { Spot } from "../utils/snap.ts";
+import { point, snap } from "../utils/snap.ts";
 import { CapitalPopup } from "./CapitalPopup.tsx";
 import { DataActions } from "./DataActions.tsx";
 import { MapSettings } from "./MapSettings.tsx";
@@ -38,6 +51,19 @@ const ZOOM = 5;
 const DEPARTURE = 700;
 const ARRIVAL = 4000;
 
+/** long-press (ms) and how far (px) the finger may move meanwhile */
+const PRESS = 500;
+const SLOP = 10;
+
+/** the place labels of Mapbox Standard */
+const LABELS = { featuresetId: "place-labels", importId: "basemap" };
+
+/** `capital` of a place label (Mapbox Streets tileset) for the capital of a country */
+const NATIONAL_CAPITAL = 2;
+
+/** classes of place labels which are not cities (as in the Mapbox Streets tileset) */
+const NOT_CITIES = new Set(["country", "disputed_country", "state", "disputed_state", "settlement_subdivision"]);
+
 // ----------------------------------------------------------------
 // COMPONENTS
 // ----------------------------------------------------------------
@@ -45,17 +71,25 @@ const ARRIVAL = 4000;
 export function MapView() {
     const items = useCapitals((state) => state.items);
     const selected = useCapitals((state) => state.selected);
+    const selection = useCapitals((state) => state.selection);
+    const countries = useCapitals((state) => state.countries);
+    const shown = useMemo(() => visible(items, countries), [items, countries]);
     const select = useCapitals((state) => state.select);
     const body = useMapStyle((state) => state.body);
     const style = useMapStyle((state) => state.style);
     const lightPreset = useMapStyle((state) => state.lightPreset);
     const theme = useMapStyle((state) => state.theme);
+    const draft = useCapitals((state) => state.draft);
+    const propose = useCapitals((state) => state.propose);
 
     const element = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map>(null);
     const markers = useRef(new Map<string, mapboxgl.Marker>());
+    const pin = useRef<mapboxgl.Marker>(null);
     const content = useRef(document.createElement("div"));
     const popup = useRef(new mapboxgl.Popup({ offset: 20, closeOnClick: false, maxWidth: "none" }));
+    const hint = useRef(new mapboxgl.Popup({ offset: 12, closeButton: false, closeOnClick: false, className: "hint" }));
+    const menu = useRef(new mapboxgl.Popup({ offset: 4, closeButton: false, closeOnMove: true, className: "menu" }));
     const loaded = useRef(keyOf(useMapStyle.getState()));
     const world = useRef(useMapStyle.getState().body);
     const trips = useRef(0);
@@ -70,25 +104,127 @@ export function MapView() {
         }
 
         mapboxgl.accessToken = token;
+        const { body } = useMapStyle.getState();
         map.current = new mapboxgl.Map({
             container: element.current,
             style: styleOf(useMapStyle.getState()),
-            center: [10, 30],
-            zoom: 1.5,
+            // labels (and so the names of cities added from them) in English, not in the local script
+            language: "en",
+            ...(body === "earth" ? viewOf(useView.getState()) : {}),
         });
 
         popup.current.setDOMContent(content.current);
-        popup.current.on("close", () => select());
+        // closing the popup drops the focus only (the selection stays)
+        popup.current.on("close", () => useCapitals.getState().blur());
 
-        // a click on the map itself (not on a marker or the popup) deselects, which closes the popup
-        map.current.on("click", (event) => {
-            if (event.originalEvent.target === map.current?.getCanvas()) {
-                select();
+        const target = map.current;
+
+        // ---- adding (on Earth) ----
+
+        // over a city (snapped): crosshair and a hint, a click adds it (a stored one: pointer, a click edits it);
+        // anywhere: right-click or long-press opens a menu to add a city at the point
+        let cursor: mapboxgl.Point | undefined;
+        let opened = 0;
+
+        const hover = () => {
+            const spot = ready.current && cursor ? spotAt(target, cursor) : undefined;
+            const stored = spot?.id !== undefined;
+            target.getCanvas().style.cursor = spot ? (stored ? "pointer" : "crosshair") : "";
+
+            if (!spot) {
+                hint.current.remove();
+                return;
+            }
+
+            const label = [spot.name, spot.country].filter(Boolean).join(", ");
+            hint.current.setLngLat(lngLat(spot)).setText(stored ? `Edit ${label}…` : `Add ${label}`);
+
+            if (!hint.current.isOpen()) {
+                hint.current.addTo(target);
+            }
+        };
+
+        const open = (at: mapboxgl.LngLat) => {
+            if (!ready.current) {
+                return;
+            }
+
+            hint.current.remove();
+            opened = Date.now();
+            const item = document.createElement("button");
+            item.type = "button";
+            item.textContent = "Add a city here";
+            item.addEventListener("click", () => {
+                menu.current.remove();
+                propose(point({ latitude: at.lat, longitude: at.lng }));
+            });
+            menu.current.setLngLat(at).setDOMContent(item);
+
+            if (!menu.current.isOpen()) {
+                menu.current.addTo(target);
+            }
+        };
+
+        // a click on the map itself (not on a marker or the popup) deselects, which closes the popup;
+        // on a city it adds the city (not right after a long-press, whose release may count as a click)
+        target.on("click", (event) => {
+            if (event.originalEvent.target !== target.getCanvas() || Date.now() - opened < PRESS) {
+                return;
+            }
+
+            select();
+            const spot = ready.current ? spotAt(target, event.point) : undefined;
+
+            if (spot) {
+                propose(spot);
             }
         });
 
+        target.on("mousemove", (event) => {
+            cursor = event.originalEvent.buttons === 0 ? event.point : undefined;
+            hover();
+        });
+        target.on("mouseout", () => {
+            cursor = undefined;
+            hover();
+        });
+        target.on("contextmenu", (event) => open(event.lngLat));
+
+        // long-press (touch): one finger, held still
+        let press: ReturnType<typeof setTimeout> | undefined;
+        let start: mapboxgl.Point | undefined;
+
+        const release = () => {
+            clearTimeout(press);
+            start = undefined;
+        };
+
+        target.on("touchstart", (event) => {
+            release();
+
+            if (event.originalEvent.touches.length === 1) {
+                const { lngLat } = event;
+                start = event.point;
+                press = setTimeout(() => open(lngLat), PRESS);
+            }
+        });
+        target.on("touchmove", (event) => {
+            if (start && event.point.dist(start) > SLOP) {
+                release();
+            }
+        });
+        target.on("touchend", release);
+        target.on("touchcancel", release);
+
         // marker size via a CSS variable, so markers need no update of their own
-        const target = map.current;
+
+        // remember the view on Earth (not during a flyby or on another world)
+        target.on("moveend", () => {
+            if (ready.current && !travelling.current) {
+                useView.getState().set(viewOf(target));
+            }
+        });
+
         const resize = () =>
             target.getContainer().style.setProperty("--marker-size", `${markerSize(target.getZoom())}px`);
         target.on("zoom", resize);
@@ -110,10 +246,11 @@ export function MapView() {
         });
 
         return () => {
+            release();
             observer.disconnect();
             map.current?.remove();
         };
-    }, [select]);
+    }, [select, propose]);
 
     // ---- appearance ----
 
@@ -129,6 +266,9 @@ export function MapView() {
         const other = body !== "earth";
         const load = () => {
             ready.current = false;
+            target.getCanvas().style.cursor = "";
+            hint.current.remove();
+            menu.current.remove();
             // full reload (no diff), so "style.load" fires and re-applies light preset and theme
             // NOTE: cast, as the typings of mapbox-gl wrongly require the font options
             target.setStyle(styleOf({ body, style }), { diff: false } as Parameters<mapboxgl.Map["setStyle"]>[1]);
@@ -138,6 +278,7 @@ export function MapView() {
 
         if (other) {
             select();
+            propose();
         }
 
         // another world: a (fake) flyby; otherwise (basemap on Earth) a plain switch
@@ -154,10 +295,15 @@ export function MapView() {
         const container = target.getContainer();
         container.classList.add("offworld");
 
-        // back on Earth with a selected city: arrive there and open its popup
+        // back on Earth: arrive at the selected city (and open its popup), otherwise at the remembered view
         const arrival = () => {
             const { selected } = useCapitals.getState();
-            return !other && selected ? { center: lngLat(selected), zoom: ZOOM } : undefined;
+
+            if (other) {
+                return undefined;
+            }
+
+            return selected ? { center: lngLat(selected), zoom: ZOOM } : viewOf(useView.getState());
         };
 
         flyby(target, load, arrival, () => trip === trips.current).then((arrived) => {
@@ -167,7 +313,7 @@ export function MapView() {
                 show(target, popup.current, useCapitals.getState().selected);
             }
         });
-    }, [body, style, select]);
+    }, [body, style, select, propose]);
 
     // light preset and theme are client-side config: no requests
     useEffect(() => {
@@ -186,7 +332,7 @@ export function MapView() {
             return;
         }
 
-        const ids = new Set(items.map(({ id }) => id));
+        const ids = new Set(shown.map(({ id }) => id));
 
         for (const [id, marker] of markers.current) {
             if (!ids.has(id)) {
@@ -195,15 +341,22 @@ export function MapView() {
             }
         }
 
-        for (const item of items) {
+        for (const item of shown) {
             let marker = markers.current.get(item.id);
 
             if (!marker) {
                 const node = document.createElement("div");
                 node.className = "marker";
+                // as next to it: select and edit; with Ctrl/Cmd or Shift: add to the selection (see the list)
                 node.addEventListener("click", (event) => {
                     event.stopPropagation();
-                    select(item.id);
+                    const how = selectingOf(event);
+
+                    if (how === "only") {
+                        propose(item);
+                    } else {
+                        select(item.id, how);
+                    }
                 });
 
                 marker = new mapboxgl.Marker({ element: node })
@@ -213,9 +366,41 @@ export function MapView() {
             }
 
             marker.setLngLat([item.longitude, item.latitude]);
-            paint(marker.getElement(), item, item.id === selected?.id);
+            paint(marker.getElement(), item, selection.includes(item.id));
         }
-    }, [items, selected, select]);
+    }, [shown, selection, propose, select]);
+
+    // limited to some countries: fit the map to their cities
+    useEffect(() => {
+        const target = map.current;
+        const { items } = useCapitals.getState();
+        const cities = visible(items, countries);
+
+        if (!target || !ready.current || countries.length === 0 || cities.length === 0) {
+            return;
+        }
+
+        const bounds = new mapboxgl.LngLatBounds();
+
+        for (const city of cities) {
+            bounds.extend(lngLat(city));
+        }
+
+        target.fitBounds(bounds, { padding: 80, maxZoom: ZOOM });
+    }, [countries]);
+
+    // ---- draft (a city proposed to add) ----
+
+    useEffect(() => {
+        pin.current?.remove();
+        pin.current = null;
+
+        if (map.current && draft) {
+            pin.current = new mapboxgl.Marker({ color: DEFAULT_COLOUR })
+                .setLngLat([draft.longitude, draft.latitude])
+                .addTo(map.current);
+        }
+    }, [draft]);
 
     // ---- selection ----
 
@@ -275,7 +460,7 @@ export function MapView() {
 function flyby(
     map: mapboxgl.Map,
     load: () => void,
-    arrival: () => { center: [number, number]; zoom: number } | undefined,
+    arrival: () => (Pick<View, "center" | "zoom"> & Partial<View>) | undefined,
     current: () => boolean,
 ): Promise<boolean> {
     const container = map.getContainer();
@@ -297,10 +482,11 @@ function flyby(
                     return;
                 }
 
-                const { center, zoom } = arrival() ?? { center: [lng, 0] as [number, number], zoom: 1.5 };
+                const destination = arrival() ?? { center: [lng, 0] as [number, number], zoom: 1.5 };
+                const { center } = destination;
                 map.jumpTo({ center: [center[0] - 150, 25], zoom: 0, bearing: -35 });
                 container.classList.remove("travelling");
-                map.flyTo({ center, zoom, bearing: 0, duration: ARRIVAL, curve: 1.2, essential: false });
+                map.flyTo({ bearing: 0, ...destination, duration: ARRIVAL, curve: 1.2, essential: false });
                 map.once("moveend", () => resolve(current()));
             });
 
@@ -325,7 +511,68 @@ function show(map: mapboxgl.Map, popup: mapboxgl.Popup, selected: Capital | unde
     }
 }
 
-function lngLat({ longitude, latitude }: Capital): [number, number] {
+/**
+ * The snappable spot at a point of the screen (see /frontend/src/utils/snap.ts), if any:
+ * a place label of Mapbox Standard (featureset `place-labels`, not of countries, states or districts),
+ * or a known place nearby.
+ */
+function spotAt(map: mapboxgl.Map, at: mapboxgl.Point): Spot | undefined {
+    const { items } = useCapitals.getState();
+    const project = ({ longitude, latitude }: Spot) => map.project([longitude, latitude]);
+    const known = places(items);
+    const label = map.queryRenderedFeatures(at, { target: LABELS }).find(isCity);
+    const { lng, lat } = map.unproject(at);
+    let spot: Spot = { latitude: lat, longitude: lng };
+
+    if (label?.geometry.type === "Point") {
+        const [longitude, latitude] = label.geometry.coordinates;
+        const { iso_3166_1: code, capital } = tileProperties(label);
+
+        spot = {
+            name: String(label.properties?.name),
+            latitude,
+            longitude,
+            country:
+                typeof code === "string" ? countryName(code, new Set(known.map(({ country }) => country))) : undefined,
+            capital: capital === NATIONAL_CAPITAL,
+        };
+    }
+
+    const result = snap(spot, known, project);
+    return result.name === undefined ? undefined : result;
+}
+
+/**
+ * All properties of a place label in its tile (the featureset only offers `name` and `class`),
+ * e.g. `iso_3166_1` (country code) and `capital` (2: of a country), as in the Mapbox Streets tileset.
+ * NOTE: `_vectorTileFeature` is internal to mapbox-gl; without it, the label only gives its name
+ */
+function tileProperties(feature: object): { [key: string]: unknown } {
+    const tile = (feature as { _vectorTileFeature?: { properties?: { [key: string]: unknown } } })._vectorTileFeature;
+    return tile?.properties ?? {};
+}
+
+/**
+ * Whether a place label is of a city (or town, village); its class is not documented, so only others are excluded.
+ */
+function isCity({ properties }: { properties?: { [key: string]: unknown } | null }): boolean {
+    return typeof properties?.name === "string" && !NOT_CITIES.has(String(properties.class));
+}
+
+/**
+ * The view of a map, or the view to restore (from the store).
+ */
+function viewOf(source: mapboxgl.Map | View): View {
+    if (source instanceof mapboxgl.Map) {
+        const { lng, lat } = source.getCenter();
+        return { center: [lng, lat], zoom: source.getZoom(), bearing: source.getBearing(), pitch: source.getPitch() };
+    }
+
+    const { center, zoom, bearing, pitch } = source;
+    return { center, zoom, bearing, pitch };
+}
+
+function lngLat({ longitude, latitude }: Spot): [number, number] {
     return [longitude, latitude];
 }
 

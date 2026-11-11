@@ -12,6 +12,7 @@ import type { Capital, CapitalInput } from "../../@api/types.gen.ts";
 import type { Resource } from "../api/capital.ts";
 import * as api from "../api/capital.ts";
 import { LOCALE } from "../utils/locale.ts";
+import type { Spot } from "../utils/snap.ts";
 import { useSettings } from "./settings.ts";
 
 // ----------------------------------------------------------------
@@ -19,6 +20,9 @@ import { useSettings } from "./settings.ts";
 // ----------------------------------------------------------------
 
 export const DEFAULT_COLOUR = "#d32f2f";
+
+/** value of `editing` for the form of a new city */
+export const NEW = "new";
 
 /** delay before a colour change is saved, so dragging in the colour picker sends one request */
 const SAVE_DELAY = 400;
@@ -30,17 +34,37 @@ const pending = new Map<string, ReturnType<typeof setTimeout>>();
 // TYPES
 // ----------------------------------------------------------------
 
+/** how a click selects: only this city, toggled (Ctrl/Cmd), or the range from the last click without Shift (Shift) */
+export type Selecting = "only" | "toggle" | "range";
+
 export interface CapitalState {
     items: Capital[];
+    /** the city in focus (last clicked; the map shows its popup) */
     selected?: Capital;
+    /** ids of all selected cities (several via Ctrl/Cmd or Shift), for bulk actions */
+    selection: string[];
+    /** where a range (Shift) starts */
+    anchor?: string;
+    /** countries the list and the map are limited to (none: all) */
+    countries: string[];
+    /** a city to add, proposed on the map (for the form, prefilled) */
+    draft?: Spot;
+    /** the open form in the sidebar: NEW (to add, with the draft if any) or the id of a city (to edit) */
+    editing?: string;
     error?: string;
 
     load: () => Promise<void>;
-    select: (id?: string) => Promise<void>;
+    select: (id?: string, how?: Selecting, order?: string[]) => Promise<void>;
+    selectAll: (ids: string[]) => void;
+    blur: () => void;
     add: (input: CapitalInput) => Promise<Capital>;
     edit: (id: string, input: CapitalInput) => Promise<Capital>;
     remove: (id: string) => Promise<void>;
-    setColour: (id: string, colour: string) => void;
+    removeMany: (ids: string[]) => Promise<void>;
+    setColour: (id: string, colour?: string) => void;
+    showCountries: (countries: string[]) => void;
+    propose: (draft?: Spot) => void;
+    setEditing: (editing?: string) => void;
 }
 
 // ----------------------------------------------------------------
@@ -52,17 +76,21 @@ export interface CapitalState {
  */
 export const useCapitals = create<CapitalState>()((set, get) => ({
     items: [],
+    selection: [],
+    countries: [],
 
     /**
-     * Loads all cities of the current resource; a selected city which is no longer listed is deselected.
+     * Loads all cities of the current resource; selected cities which are no longer listed are deselected.
      */
     load: async () => {
         try {
             const items = await api.list(resource());
+            const ids = new Set(items.map(({ id }) => id));
 
             set((state) => ({
                 items,
-                selected: items.some(({ id }) => id === state.selected?.id) ? state.selected : undefined,
+                selected: state.selected && ids.has(state.selected.id) ? state.selected : undefined,
+                selection: state.selection.filter((id) => ids.has(id)),
                 error: undefined,
             }));
         } catch (err) {
@@ -71,24 +99,67 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
     },
 
     /**
-     * Selects a city via GET /capital/{id} or /city/{id}; no id clears the selection.
+     * Selects a city (see `Selecting`; a range follows `order`, by default the list) and focuses it
+     * via GET /capital/{id} or /city/{id}; a city toggled off loses the focus. No id clears the selection.
      */
-    select: async (id) => {
+    select: async (id, how = "only", order = get().items.map((item) => item.id)) => {
         if (id === undefined) {
-            set({ selected: undefined });
+            set({ selected: undefined, selection: [], anchor: undefined });
+            return;
+        }
+
+        const { selection, anchor } = get();
+        const next = selecting(selection, anchor, id, how, order);
+
+        // selecting drops a city proposed on the map (and its form to add), silently
+        set((state) => ({
+            selection: next,
+            anchor: how === "range" ? (anchor ?? id) : id,
+            ...dropDraft(state),
+        }));
+
+        if (!next.includes(id)) {
+            set((state) => ({ selected: state.selected?.id === id ? undefined : state.selected }));
             return;
         }
 
         try {
-            set({ selected: await api.get(resource(), id), error: undefined });
+            const item = await api.get(resource(), id);
+
+            // still selected (a quick toggle may have removed it meanwhile)
+            if (get().selection.includes(id)) {
+                set({ selected: item, error: undefined });
+            }
         } catch (err) {
             set({ error: String(err) });
         }
     },
 
+    /**
+     * Selects several cities at once (e.g. all matches of a search), without focus.
+     */
+    selectAll: (ids) => {
+        set((state) => ({ selection: [...ids], anchor: ids[0], selected: undefined, ...dropDraft(state) }));
+    },
+
+    /**
+     * Drops the focus (e.g. the popup was closed), keeps the selection.
+     */
+    blur: () => {
+        set({ selected: undefined });
+    },
+
+    /**
+     * Adds a city; one which is not a capital goes to /city even with "Capitals only" (and is then not listed).
+     */
     add: async (input) => {
-        const item = await api.create(resource(), input);
-        set((state) => ({ items: sort([...state.items, item]) }));
+        const target = input.capital ? resource() : "city";
+        const item = await api.create(target, input);
+
+        if (target === resource()) {
+            set((state) => ({ items: sort([...state.items, item]) }));
+        }
+
         return item;
     },
 
@@ -108,16 +179,35 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
     },
 
     remove: async (id) => {
-        await api.remove(resource(), id);
+        await get().removeMany([id]);
+    },
+
+    /**
+     * Deletes cities (one request each, as the API has no bulk delete);
+     * those deleted are gone even if others fail, then the first failure is thrown.
+     */
+    removeMany: async (ids) => {
+        const target = resource();
+        const results = await Promise.allSettled(ids.map((id) => api.remove(target, id)));
+        const gone = new Set(ids.filter((_, i) => results[i].status === "fulfilled"));
 
         set((state) => ({
-            items: state.items.filter((item) => item.id !== id),
-            selected: state.selected?.id === id ? undefined : state.selected,
+            items: state.items.filter((item) => !gone.has(item.id)),
+            selected: state.selected && gone.has(state.selected.id) ? undefined : state.selected,
+            selection: state.selection.filter((id) => !gone.has(id)),
+            editing: state.editing !== undefined && gone.has(state.editing) ? undefined : state.editing,
         }));
+
+        const failure = results.find((result) => result.status === "rejected");
+
+        if (failure) {
+            throw failure.reason;
+        }
     },
 
     /**
      * Shows a colour at once and saves it (PUT) after a short delay; a failed save is reported as error.
+     * No colour removes it (the default colour is shown).
      */
     setColour: (id, colour) => {
         const paint = (item: Capital) => (item.id === id ? { ...item, colour } : item);
@@ -148,7 +238,81 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
             }, SAVE_DELAY),
         );
     },
+
+    /**
+     * Proposes a city to add (opens the form to add); a stored one is selected and opened to edit instead.
+     * No draft withdraws the proposal (and closes its form).
+     */
+    propose: (draft) => {
+        if (draft?.id !== undefined) {
+            const { id } = draft;
+
+            // a city outside the countries shown (still snapped to on the map): show all
+            set((state) => ({
+                draft: undefined,
+                editing: id,
+                countries: visible(state.items, state.countries).some((item) => item.id === id) ? state.countries : [],
+            }));
+            get().select(draft.id);
+            return;
+        }
+
+        set((state) => ({ draft, editing: draft ? NEW : state.editing === NEW ? undefined : state.editing }));
+    },
+
+    /**
+     * Opens a form (or closes it, without argument); a draft is dropped.
+     */
+    setEditing: (editing) => {
+        set({ editing, draft: undefined });
+    },
+
+    /**
+     * Limits the list and the map to some countries (none: all); selected cities outside are deselected.
+     */
+    showCountries: (countries) => {
+        set((state) => {
+            const shown = new Set(visible(state.items, countries).map(({ id }) => id));
+
+            return {
+                countries: [...new Set(countries)],
+                selection: state.selection.filter((id) => shown.has(id)),
+                selected: state.selected && shown.has(state.selected.id) ? state.selected : undefined,
+            };
+        });
+    },
 }));
+
+// ----------------------------------------------------------------
+// METHODS
+// ----------------------------------------------------------------
+
+/**
+ * The cities of some countries (none: all).
+ */
+export function visible(items: Capital[], countries: string[]): Capital[] {
+    if (countries.length === 0) {
+        return items;
+    }
+
+    const shown = new Set(countries);
+    return items.filter(({ country }) => shown.has(country));
+}
+
+/**
+ * How a click selects, by its modifier keys: Ctrl/Cmd toggles, Shift selects a range.
+ */
+export function selectingOf({
+    ctrlKey,
+    metaKey,
+    shiftKey,
+}: Pick<MouseEvent, "ctrlKey" | "metaKey" | "shiftKey">): Selecting {
+    if (ctrlKey || metaKey) {
+        return "toggle";
+    }
+
+    return shiftKey ? "range" : "only";
+}
 
 // ----------------------------------------------------------------
 // AUXILIARY METHODS
@@ -159,6 +323,37 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
  */
 function resource(): Resource {
     return useSettings.getState().capitalsOnly ? "capital" : "city";
+}
+
+/**
+ * Without the city proposed on the map, and without its form to add (if open).
+ */
+function dropDraft({ editing }: CapitalState): Partial<CapitalState> {
+    return { draft: undefined, editing: editing === NEW ? undefined : editing };
+}
+
+/**
+ * The next selection after a click on `id` (see `Selecting`).
+ */
+function selecting(selection: string[], anchor: string | undefined, id: string, how: Selecting, order: string[]) {
+    switch (how) {
+        case "toggle":
+            return selection.includes(id) ? selection.filter((other) => other !== id) : [...selection, id];
+
+        case "range": {
+            const start = order.indexOf(anchor ?? id);
+            const end = order.indexOf(id);
+
+            if (start < 0 || end < 0) {
+                return [id];
+            }
+
+            return order.slice(Math.min(start, end), Math.max(start, end) + 1);
+        }
+
+        default:
+            return [id];
+    }
 }
 
 /**

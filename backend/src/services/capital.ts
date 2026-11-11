@@ -119,6 +119,17 @@ export async function insertMany(items: CapitalData[]): Promise<number> {
 }
 
 /**
+ * Adds cities only if none are stored (e.g. the examples on start). Returns the number of cities added.
+ */
+export async function insertIfEmpty(items: CapitalData[]): Promise<number> {
+    if ((await capitals().estimatedDocumentCount()) > 0) {
+        return 0;
+    }
+
+    return insertMany(items);
+}
+
+/**
  * Removes all cities (the collection with its schema and indexes stays). Returns the number removed.
  */
 export async function clear(): Promise<number> {
