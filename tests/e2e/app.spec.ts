@@ -34,7 +34,7 @@ test("shows the list of capitals", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Capitals" })).toBeVisible();
 });
 
-test("shows a 32px × 32px marker per capital, with a popup to change its colour and to delete it", async ({
+test("shows a 32px × 32px marker per capital, with a popup (colour, delete) and its form to edit", async ({
     page,
     request,
 }) => {
@@ -46,9 +46,13 @@ test("shows a 32px × 32px marker per capital, with a popup to change its colour
     const marker = page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`);
     await marker.click();
 
-    // the map flies there (close up: 32px), the popup opens
-    const popup = page.locator(".mapboxgl-popup");
+    // the map flies there (close up: 32px), the popup opens (not the hint or the menu, also popups of mapbox-gl)
+    const popup = page.locator(".mapboxgl-popup", { has: page.locator(".popup") });
     await expect(popup).toContainText(`${NAME}, ${COUNTRY}`);
+
+    // the sidebar opens the city to edit
+    const form = page.locator(".sidebar .capital-form");
+    await expect(form.getByRole("textbox", { name: "City" })).toHaveValue(NAME);
     await expect.poll(async () => (await marker.boundingBox())?.width, { timeout: 10_000 }).toBeCloseTo(32, 0);
     expect((await marker.boundingBox())?.height).toBeCloseTo(32, 0);
 
@@ -64,6 +68,7 @@ test("shows a 32px × 32px marker per capital, with a popup to change its colour
     await popup.getByRole("button", { name: `Delete ${NAME}` }).click();
     await expect(marker).toHaveCount(0);
     await expect(page.locator(".sidebar .entry", { hasText: NAME })).toHaveCount(0);
+    await expect(form).toHaveCount(0);
 });
 
 test("adds, edits and deletes a capital", async ({ page }) => {

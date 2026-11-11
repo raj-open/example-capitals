@@ -7,7 +7,8 @@
  * On Earth, a city can be proposed to add: over a city (a place label of the map or a known place,
  * see /frontend/src/utils/snap.ts) the cursor is a crosshair with a hint, and a click adds it;
  * anywhere, right-click or long-press opens a menu "Add a city here" (the point itself);
- * a pin marks the spot and the form in the sidebar opens, prefilled; a stored city is selected instead.
+ * a pin marks the spot and the form in the sidebar opens, prefilled;
+ * a stored city (its marker, or next to it: hint "Edit …") is selected and opened in the sidebar to edit instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
  * The view on Earth is remembered (see /frontend/src/store/view.ts): a reload, or a return from another world, keeps it.
@@ -109,21 +110,23 @@ export function MapView() {
 
         // ---- adding (on Earth) ----
 
-        // over a city (snapped): crosshair and a hint, a click adds it;
+        // over a city (snapped): crosshair and a hint, a click adds it (a stored one: pointer, a click edits it);
         // anywhere: right-click or long-press opens a menu to add a city at the point
         let cursor: mapboxgl.Point | undefined;
         let opened = 0;
 
         const hover = () => {
             const spot = ready.current && cursor ? spotAt(target, cursor) : undefined;
-            target.getCanvas().style.cursor = spot ? "crosshair" : "";
+            const stored = spot?.id !== undefined;
+            target.getCanvas().style.cursor = spot ? (stored ? "pointer" : "crosshair") : "";
 
             if (!spot) {
                 hint.current.remove();
                 return;
             }
 
-            hint.current.setLngLat(lngLat(spot)).setText(`Add ${[spot.name, spot.country].filter(Boolean).join(", ")}`);
+            const label = [spot.name, spot.country].filter(Boolean).join(", ");
+            hint.current.setLngLat(lngLat(spot)).setText(stored ? `Edit ${label}…` : `Add ${label}`);
 
             if (!hint.current.isOpen()) {
                 hint.current.addTo(target);
@@ -333,9 +336,10 @@ export function MapView() {
             if (!marker) {
                 const node = document.createElement("div");
                 node.className = "marker";
+                // as next to it: select and edit
                 node.addEventListener("click", (event) => {
                     event.stopPropagation();
-                    select(item.id);
+                    propose(item);
                 });
 
                 marker = new mapboxgl.Marker({ element: node })
@@ -347,7 +351,7 @@ export function MapView() {
             marker.setLngLat([item.longitude, item.latitude]);
             paint(marker.getElement(), item, item.id === selected?.id);
         }
-    }, [items, selected, select]);
+    }, [items, selected, propose]);
 
     // ---- draft (a city proposed to add) ----
 

@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../src/api/capital.ts";
-import { useCapitals } from "../src/store/capital.ts";
+import { NEW, useCapitals } from "../src/store/capital.ts";
 import { useSettings } from "../src/store/settings.ts";
 
 // ----------------------------------------------------------------
@@ -16,7 +16,13 @@ vi.mock("../src/api/capital.ts");
 
 describe("useCapitals", () => {
     beforeEach(() => {
-        useCapitals.setState({ items: [], selected: undefined, draft: undefined, error: undefined });
+        useCapitals.setState({
+            items: [],
+            selected: undefined,
+            draft: undefined,
+            editing: undefined,
+            error: undefined,
+        });
         useSettings.setState({ capitalsOnly: true });
     });
 
@@ -153,12 +159,22 @@ describe("useCapitals", () => {
 
         useCapitals.getState().propose(draft);
         expect(useCapitals.getState().draft).toEqual(draft);
+        expect(useCapitals.getState().editing).toBe(NEW);
 
         useCapitals.getState().propose();
         expect(useCapitals.getState().draft).toBeUndefined();
+        expect(useCapitals.getState().editing).toBeUndefined();
     });
 
-    it("selects a stored city instead of proposing it", async () => {
+    it("drops the draft when another form opens", () => {
+        useCapitals.getState().propose({ latitude: 0, longitude: 0 });
+        useCapitals.getState().setEditing("1");
+
+        expect(useCapitals.getState().draft).toBeUndefined();
+        expect(useCapitals.getState().editing).toBe("1");
+    });
+
+    it("selects a stored city and opens it to edit instead of proposing it", async () => {
         const paris = { id: "1", name: "Paris", country: "France", latitude: 48.86, longitude: 2.35, capital: true };
         vi.mocked(api.get).mockResolvedValue(paris);
         useCapitals.setState({ draft: { latitude: 0, longitude: 0 } });
@@ -166,5 +182,6 @@ describe("useCapitals", () => {
         useCapitals.getState().propose(paris);
         await vi.waitFor(() => expect(useCapitals.getState().selected).toEqual(paris));
         expect(useCapitals.getState().draft).toBeUndefined();
+        expect(useCapitals.getState().editing).toBe("1");
     });
 });

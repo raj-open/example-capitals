@@ -16,7 +16,7 @@
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { useCapitals } from "../store/capital.ts";
+import { NEW, useCapitals } from "../store/capital.ts";
 import { useSettings } from "../store/settings.ts";
 import { LOCALE } from "../utils/locale.ts";
 import { type Query, search } from "../utils/search.ts";
@@ -28,9 +28,6 @@ import { Chevron, Plus } from "./icons.tsx";
 // LOCAL CONSTANTS
 // ----------------------------------------------------------------
 
-/** value of `editing` for the form of a new capital */
-const NEW = "new";
-
 const EMPTY: Query = { country: "", name: "" };
 
 // ----------------------------------------------------------------
@@ -38,13 +35,12 @@ const EMPTY: Query = { country: "", name: "" };
 // ----------------------------------------------------------------
 
 export function CapitalList() {
-    const { items, selected, draft, error, select, add, edit, remove, propose } = useCapitals();
+    const { items, selected, draft, editing, error, select, add, edit, remove, setEditing } = useCapitals();
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const setSettings = useSettings((state) => state.set);
     const title = capitalsOnly ? "Capitals" : "Cities";
 
     const [collapsed, setCollapsed] = useState(false);
-    const [editing, setEditing] = useState<string>(); // id, or NEW
     const [problem, setProblem] = useState<string>();
     const [query, setQuery] = useState<Query>(EMPTY);
     const [index, setIndex] = useState(0);
@@ -61,25 +57,24 @@ export function CapitalList() {
     }, [items, matches, searching]);
     const noun = capitalsOnly ? "capital" : "city";
 
-    // ---- draft (proposed on the map) ----
+    // ---- forms (also opened from the map) ----
 
     useEffect(() => {
-        if (draft) {
+        if (editing !== undefined) {
             setCollapsed(false);
-            setEditing(NEW);
         }
-    }, [draft]);
+    }, [editing]);
 
-    /** opens a form (to add or edit) without a draft */
-    function open(id: string) {
-        propose();
-        setEditing(id);
-    }
+    const close = () => setEditing();
 
-    function close() {
-        setEditing(undefined);
-        propose();
-    }
+    /** keeps the node of an entry (or its form), for scrolling */
+    const keep = (id: string) => (node: HTMLLIElement | null) => {
+        if (node) {
+            nodes.current.set(id, node);
+        } else {
+            nodes.current.delete(id);
+        }
+    };
 
     // ---- scrolling ----
 
@@ -156,7 +151,7 @@ export function CapitalList() {
             <header>
                 <div className="sidebar-title">
                     <h2>{title}</h2>
-                    <button type="button" title="Add" aria-label="Add capital" onClick={() => open(NEW)}>
+                    <button type="button" title="Add" aria-label="Add capital" onClick={() => setEditing(NEW)}>
                         <Plus />
                     </button>
                     <button
@@ -216,14 +211,14 @@ export function CapitalList() {
             <ul>
                 {shown.map((item, i) =>
                     editing === item.id ? (
-                        <li key={item.id}>
+                        <li key={item.id} ref={keep(item.id)}>
                             <CapitalForm
                                 initial={item}
                                 action="Save"
-                                onCancel={() => setEditing(undefined)}
+                                onCancel={close}
                                 onSubmit={async (input) => {
                                     await edit(item.id, input);
-                                    setEditing(undefined);
+                                    close();
                                 }}
                             />
                         </li>
@@ -237,15 +232,9 @@ export function CapitalList() {
                                 selected: item.id === selected?.id,
                                 active: searching && item.id === active,
                             })}
-                            ref={(node) => {
-                                if (node) {
-                                    nodes.current.set(item.id, node);
-                                } else {
-                                    nodes.current.delete(item.id);
-                                }
-                            }}
+                            ref={keep(item.id)}
                             onSelect={() => select(item.id)}
-                            onEdit={() => open(item.id)}
+                            onEdit={() => setEditing(item.id)}
                             onDelete={() => onDelete(item.id, `${item.name}, ${item.country}`)}
                         />
                     ),

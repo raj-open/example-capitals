@@ -21,6 +21,9 @@ import { useSettings } from "./settings.ts";
 
 export const DEFAULT_COLOUR = "#d32f2f";
 
+/** value of `editing` for the form of a new city */
+export const NEW = "new";
+
 /** delay before a colour change is saved, so dragging in the colour picker sends one request */
 const SAVE_DELAY = 400;
 
@@ -34,8 +37,10 @@ const pending = new Map<string, ReturnType<typeof setTimeout>>();
 export interface CapitalState {
     items: Capital[];
     selected?: Capital;
-    /** a city to add, proposed on the map (opens the form, prefilled) */
+    /** a city to add, proposed on the map (for the form, prefilled) */
     draft?: Spot;
+    /** the open form in the sidebar: NEW (to add, with the draft if any) or the id of a city (to edit) */
+    editing?: string;
     error?: string;
 
     load: () => Promise<void>;
@@ -45,6 +50,7 @@ export interface CapitalState {
     remove: (id: string) => Promise<void>;
     setColour: (id: string, colour: string) => void;
     propose: (draft?: Spot) => void;
+    setEditing: (editing?: string) => void;
 }
 
 // ----------------------------------------------------------------
@@ -125,6 +131,7 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
         set((state) => ({
             items: state.items.filter((item) => item.id !== id),
             selected: state.selected?.id === id ? undefined : state.selected,
+            editing: state.editing === id ? undefined : state.editing,
         }));
     },
 
@@ -162,16 +169,24 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
     },
 
     /**
-     * Proposes a city to add; a stored one is selected instead. No draft withdraws the proposal.
+     * Proposes a city to add (opens the form to add); a stored one is selected and opened to edit instead.
+     * No draft withdraws the proposal (and closes its form).
      */
     propose: (draft) => {
         if (draft?.id !== undefined) {
-            set({ draft: undefined });
+            set({ draft: undefined, editing: draft.id });
             get().select(draft.id);
             return;
         }
 
-        set({ draft });
+        set((state) => ({ draft, editing: draft ? NEW : state.editing === NEW ? undefined : state.editing }));
+    },
+
+    /**
+     * Opens a form (or closes it, without argument); a draft is dropped.
+     */
+    setEditing: (editing) => {
+        set({ editing, draft: undefined });
     },
 }));
 
