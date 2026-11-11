@@ -4,9 +4,10 @@
  *
  * Clicking a marker selects its capital (GET /capital/{name});
  * the map then flies to the selected capital and opens a popup to change the colour of its marker.
- * On Earth, a right-click (long-press on touch devices which support it) proposes a city to add:
- * it snaps to a place label of the map and to known places (see /frontend/src/utils/snap.ts),
- * marks the spot with a pin and opens the form in the sidebar, prefilled; a stored city is selected instead.
+ * On Earth, Shift + click proposes a city to add (crosshair while Shift is held):
+ * snapped to a city under the cursor (a place label of the map or a known place, see /frontend/src/utils/snap.ts),
+ * named in a hint, otherwise the point itself;
+ * a pin marks the spot and the form in the sidebar opens, prefilled; a stored city is selected instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
  * The view on Earth is remembered (see /frontend/src/store/view.ts): a reload, or a return from another world, keeps it.
@@ -30,7 +31,7 @@ import type { View } from "../store/view.ts";
 import { useView } from "../store/view.ts";
 import { markerSize } from "../utils/markers.ts";
 import type { Spot } from "../utils/snap.ts";
-import { snap } from "../utils/snap.ts";
+import { point, snap } from "../utils/snap.ts";
 import { CapitalPopup } from "./CapitalPopup.tsx";
 import { DataActions } from "./DataActions.tsx";
 import { MapSettings } from "./MapSettings.tsx";
@@ -47,8 +48,11 @@ const ZOOM = 5;
 const DEPARTURE = 700;
 const ARRIVAL = 4000;
 
-/** ids of the interactions which propose a city (on a place label, elsewhere) */
-const PROPOSE = { label: "propose-label", point: "propose-point" } as const;
+/** the place labels of Mapbox Standard */
+const LABELS = { featuresetId: "place-labels", importId: "basemap" };
+
+/** classes of place labels which are not cities (as in the Mapbox Streets tileset) */
+const NOT_CITIES = new Set(["country", "disputed_country", "state", "disputed_state", "settlement_subdivision"]);
 
 // ----------------------------------------------------------------
 // COMPONENTS
@@ -71,6 +75,7 @@ export function MapView() {
     const pin = useRef<mapboxgl.Marker>(null);
     const content = useRef(document.createElement("div"));
     const popup = useRef(new mapboxgl.Popup({ offset: 20, closeOnClick: false, maxWidth: "none" }));
+    const hint = useRef(new mapboxgl.Popup({ offset: 12, closeButton: false, closeOnClick: false, className: "hint" }));
     const loaded = useRef(keyOf(useMapStyle.getState()));
     const world = useRef(useMapStyle.getState().body);
     const trips = useRef(0);
@@ -95,15 +100,67 @@ export function MapView() {
         popup.current.setDOMContent(content.current);
         popup.current.on("close", () => select());
 
+        const target = map.current;
+
         // a click on the map itself (not on a marker or the popup) deselects, which closes the popup
-        map.current.on("click", (event) => {
-            if (event.originalEvent.target === map.current?.getCanvas()) {
-                select();
+        target.on("click", (event) => {
+            if (event.originalEvent.target !== target.getCanvas()) {
+                return;
+            }
+
+            select();
+
+            if (ready.current && event.originalEvent.shiftKey) {
+                const { lng, lat } = event.lngLat;
+                propose(spotAt(target, event.point) ?? point({ latitude: lat, longitude: lng }));
             }
         });
 
+        // ---- adding (Shift held, on Earth) ----
+
+        // Shift + click adds a city: snapped to a city under the cursor (named in a hint), otherwise the point itself;
+        // NOTE: Shift + drag (box zoom of Mapbox) is off, as it would compete
+        target.boxZoom.disable();
+        let cursor: mapboxgl.Point | undefined;
+
+        const hover = (shift: boolean) => {
+            const at = shift && ready.current ? cursor : undefined;
+            const spot = at && spotAt(target, at);
+            target.getCanvas().style.cursor = at ? "crosshair" : "";
+
+            if (!spot) {
+                hint.current.remove();
+                return;
+            }
+
+            hint.current.setLngLat(lngLat(spot)).setText([spot.name, spot.country].filter(Boolean).join(", "));
+
+            if (!hint.current.isOpen()) {
+                hint.current.addTo(target);
+            }
+        };
+
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Shift") {
+                hover(event.type === "keydown");
+            }
+        };
+        const onBlur = () => hover(false);
+
+        target.on("mousemove", (event) => {
+            const { originalEvent } = event;
+            cursor = event.point;
+            hover(originalEvent.shiftKey && originalEvent.buttons === 0);
+        });
+        target.on("mouseout", () => {
+            cursor = undefined;
+            hover(false);
+        });
+        window.addEventListener("keydown", onKey);
+        window.addEventListener("keyup", onKey);
+        window.addEventListener("blur", onBlur);
+
         // marker size via a CSS variable, so markers need no update of their own
-        const target = map.current;
 
         // remember the view on Earth (not during a flyby or on another world)
         target.on("moveend", () => {
@@ -129,15 +186,17 @@ export function MapView() {
 
             if (ready.current) {
                 applyAppearance(target, appearance);
-                listen(target);
             }
         });
 
         return () => {
+            window.removeEventListener("keydown", onKey);
+            window.removeEventListener("keyup", onKey);
+            window.removeEventListener("blur", onBlur);
             observer.disconnect();
             map.current?.remove();
         };
-    }, [select]);
+    }, [select, propose]);
 
     // ---- appearance ----
 
@@ -153,7 +212,8 @@ export function MapView() {
         const other = body !== "earth";
         const load = () => {
             ready.current = false;
-            unlisten(target);
+            target.getCanvas().style.cursor = "";
+            hint.current.remove();
             // full reload (no diff), so "style.load" fires and re-applies light preset and theme
             // NOTE: cast, as the typings of mapbox-gl wrongly require the font options
             target.setStyle(styleOf({ body, style }), { diff: false } as Parameters<mapboxgl.Map["setStyle"]>[1]);
@@ -371,45 +431,31 @@ function show(map: mapboxgl.Map, popup: mapboxgl.Popup, selected: Capital | unde
 }
 
 /**
- * Right-click proposes a city (only on Earth: added on each load of a Mapbox style, removed before a switch):
- * on a place label of Mapbox Standard (featureset `place-labels`) with its name, elsewhere the point itself.
- * NOTE: the interaction on the label stops the event, so the one without target only handles the rest
+ * The snappable spot at a point of the screen (see /frontend/src/utils/snap.ts), if any:
+ * a place label of Mapbox Standard (featureset `place-labels`, not of countries, states or districts),
+ * or a known place nearby.
  */
-function listen(map: mapboxgl.Map) {
-    unlisten(map);
-
-    map.addInteraction(PROPOSE.label, {
-        type: "contextmenu",
-        target: { featuresetId: "place-labels", importId: "basemap" },
-        handler: (event) => {
-            const { feature } = event;
-            const name = feature?.properties.name;
-
-            if (feature?.geometry.type !== "Point" || typeof name !== "string") {
-                return false;
-            }
-
-            const [longitude, latitude] = feature.geometry.coordinates;
-            proposeAt(map, { name, latitude, longitude });
-        },
-    });
-
-    map.addInteraction(PROPOSE.point, {
-        type: "contextmenu",
-        handler: (event) => proposeAt(map, { latitude: event.lngLat.lat, longitude: event.lngLat.lng }),
-    });
-}
-
-function unlisten(map: mapboxgl.Map) {
-    map.removeInteraction(PROPOSE.label);
-    map.removeInteraction(PROPOSE.point);
-}
-
-function proposeAt(map: mapboxgl.Map, spot: Spot) {
-    const { items, propose } = useCapitals.getState();
+function spotAt(map: mapboxgl.Map, at: mapboxgl.Point): Spot | undefined {
+    const { items } = useCapitals.getState();
     const project = ({ longitude, latitude }: Spot) => map.project([longitude, latitude]);
+    const label = map.queryRenderedFeatures(at, { target: LABELS }).find(isCity);
+    const { lng, lat } = map.unproject(at);
+    let spot: Spot = { latitude: lat, longitude: lng };
 
-    propose(snap(spot, places(items), project));
+    if (label?.geometry.type === "Point") {
+        const [longitude, latitude] = label.geometry.coordinates;
+        spot = { name: String(label.properties?.name), latitude, longitude };
+    }
+
+    const result = snap(spot, places(items), project);
+    return result.name === undefined ? undefined : result;
+}
+
+/**
+ * Whether a place label is of a city (or town, village); its class is not documented, so only others are excluded.
+ */
+function isCity({ properties }: { properties?: { [key: string]: unknown } | null }): boolean {
+    return typeof properties?.name === "string" && !NOT_CITIES.has(String(properties.class));
 }
 
 /**

@@ -505,6 +505,16 @@ input {
     font-size: 0.8rem;
 }
 
+/* hint while adding (Shift held): the city under the cursor; it must not catch the click */
+.map .mapboxgl-popup.hint {
+    pointer-events: none;
+}
+
+.map .hint .mapboxgl-popup-content {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
 /* ---------------------------------------------------------------- */
 /* map controls: permanent round buttons (top right, stacked); each panel opens to the left of its button */
 /* ---------------------------------------------------------------- */

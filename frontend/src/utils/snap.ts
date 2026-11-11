@@ -81,7 +81,10 @@ function nearby(spot: Spot, places: Place[], project: Project, radius: number): 
         .map(({ place }) => place);
 }
 
-function point({ latitude, longitude }: Spot): Spot {
+/**
+ * A point by itself (rounded).
+ */
+export function point({ latitude, longitude }: Spot): Spot {
     return { latitude: round(latitude), longitude: round(longitude) };
 }
 
