@@ -42,8 +42,6 @@ export const settings = {
         // selection (applied locally, as the API can neither filter nor sort by population)
         populationMin: toNumber(process.env.RESTCOUNTRIES_POPULATION_MIN, 0),
         top: toNumber(process.env.RESTCOUNTRIES_TOP, Number.POSITIVE_INFINITY),
-        // re-import even if the collection is not empty (each import costs ⌈total / limit⌉ requests of the monthly quota)
-        refresh: process.env.RESTCOUNTRIES_REFRESH === "true",
     },
 } as const;
 

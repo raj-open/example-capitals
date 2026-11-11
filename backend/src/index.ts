@@ -1,8 +1,8 @@
 /**
- * Entrypoint: connect to the DB, serve the API, then import data.
+ * Entrypoint: connect to the DB, serve the API; an empty DB gets the example cities.
  *
- * NOTE: the API listens before the import (which takes seconds), so a client started at the same time
- * (e.g. the UI's dev server) is not refused; until the import is done, the DB may still be empty
+ * Nothing is imported from REST Countries on start (it costs requests of the monthly quota):
+ * capitals and other cities are added on request (POST /data/capitals, /data/cities; settings panel or `just data-*`).
  */
 
 // ----------------------------------------------------------------
@@ -13,7 +13,8 @@ import { connect } from "./db/client.ts";
 
 import { settings } from "./_core/settings.ts";
 import { createApp } from "./app.ts";
-import { importOnStart } from "./services/countries.ts";
+import { EXAMPLES } from "./data/examples.ts";
+import { insertIfEmpty } from "./services/capital.ts";
 
 // ----------------------------------------------------------------
 // MAIN
@@ -25,9 +26,9 @@ createApp().listen(settings.port, async () => {
     console.log(`API on http://localhost:${settings.port}`);
 
     try {
-        const count = await importOnStart();
-        console.log(`imported ${count} capitals`);
+        const count = await insertIfEmpty(EXAMPLES);
+        console.log(count > 0 ? `empty DB: added ${count} example cities` : "cities already stored");
     } catch (err) {
-        console.error("import failed:", err);
+        console.error("adding the examples failed:", err);
     }
 });
