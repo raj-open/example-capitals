@@ -157,7 +157,7 @@ curl -s -X DELETE localhost:3001/capital/<id>
 
 ## Data ##
 
-On startup, the backend imports all countries and their capitals from [REST Countries](https://restcountries.com) v5 (`country` = common name, `name` = first capital). It does so once the API listens, so the UI may show an empty list for a few seconds on a first start: reload once the log says `imported … capitals`. The import is skipped if capitals are already stored, so restarts do not use up the monthly quota; set `RESTCOUNTRIES_REFRESH=true` in `.env` to import again. `RESTCOUNTRIES_POPULATION_MIN` and `RESTCOUNTRIES_TOP` narrow the selection by population.
+On startup, the backend only adds the example cities, and only to an empty database. All countries and their capitals are imported from [REST Countries](https://restcountries.com) v5 (`country` = common name, `name` = first capital) on request: via the data panel of the map or `just data-capitals` (each import costs requests of the monthly quota). `RESTCOUNTRIES_POPULATION_MIN` and `RESTCOUNTRIES_TOP` narrow the selection by population.
 
 The data panel on the map (and the endpoints below) clears and fills the database, for tests and demos. Set `DATA_ACTIONS=false` where data must be kept.
 
