@@ -5,7 +5,7 @@
  *   ↑/↓ cycle through matches, Enter selects, Esc clears
  * - selecting an entry selects the city (GET /capital/{id}), which moves the map there
  * - per entry: colour dot (= marker colour), edit and delete; add via + in the header,
- *   or via Shift + click on the map (the form opens prefilled, see /frontend/src/components/MapView.tsx)
+ *   or via the map: a click on a city, or right-click / long-press anywhere (the form opens prefilled, see /frontend/src/components/MapView.tsx)
  * - grouped by country (name only on the first entry of a group), the capital first
  * - "Capitals only" (default, remembered): /capital; otherwise /city (all cities, capitals marked with a star)
  */

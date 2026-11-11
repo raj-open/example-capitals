@@ -505,7 +505,7 @@ input {
     font-size: 0.8rem;
 }
 
-/* hint while adding (Shift held): the city under the cursor; it must not catch the click */
+/* hint over a city which can be added (crosshair); it must not catch the click */
 .map .mapboxgl-popup.hint {
     pointer-events: none;
 }
@@ -513,6 +513,26 @@ input {
 .map .hint .mapboxgl-popup-content {
     padding: 0.25rem 0.5rem;
     font-size: 0.8rem;
+}
+
+/* menu of right-click or long-press: "Add a city here" */
+.map .menu .mapboxgl-popup-content {
+    padding: 0.25rem;
+}
+
+.map .menu button {
+    padding: 0.35rem 0.6rem;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.map .menu button:hover,
+.map .menu button:focus-visible {
+    background: var(--subtle);
 }
 
 /* ---------------------------------------------------------------- */

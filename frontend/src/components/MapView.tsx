@@ -4,9 +4,9 @@
  *
  * Clicking a marker selects its capital (GET /capital/{name});
  * the map then flies to the selected capital and opens a popup to change the colour of its marker.
- * On Earth, Shift + click proposes a city to add (crosshair while Shift is held):
- * snapped to a city under the cursor (a place label of the map or a known place, see /frontend/src/utils/snap.ts),
- * named in a hint, otherwise the point itself;
+ * On Earth, a city can be proposed to add: over a city (a place label of the map or a known place,
+ * see /frontend/src/utils/snap.ts) the cursor is a crosshair with a hint, and a click adds it;
+ * anywhere, right-click or long-press opens a menu "Add a city here" (the point itself);
  * a pin marks the spot and the form in the sidebar opens, prefilled; a stored city is selected instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
@@ -48,6 +48,10 @@ const ZOOM = 5;
 const DEPARTURE = 700;
 const ARRIVAL = 4000;
 
+/** long-press (ms) and how far (px) the finger may move meanwhile */
+const PRESS = 500;
+const SLOP = 10;
+
 /** the place labels of Mapbox Standard */
 const LABELS = { featuresetId: "place-labels", importId: "basemap" };
 
@@ -76,6 +80,7 @@ export function MapView() {
     const content = useRef(document.createElement("div"));
     const popup = useRef(new mapboxgl.Popup({ offset: 20, closeOnClick: false, maxWidth: "none" }));
     const hint = useRef(new mapboxgl.Popup({ offset: 12, closeButton: false, closeOnClick: false, className: "hint" }));
+    const menu = useRef(new mapboxgl.Popup({ offset: 4, closeButton: false, closeOnMove: true, className: "menu" }));
     const loaded = useRef(keyOf(useMapStyle.getState()));
     const world = useRef(useMapStyle.getState().body);
     const trips = useRef(0);
@@ -102,63 +107,100 @@ export function MapView() {
 
         const target = map.current;
 
-        // a click on the map itself (not on a marker or the popup) deselects, which closes the popup
-        target.on("click", (event) => {
-            if (event.originalEvent.target !== target.getCanvas()) {
-                return;
-            }
+        // ---- adding (on Earth) ----
 
-            select();
-
-            if (ready.current && event.originalEvent.shiftKey) {
-                const { lng, lat } = event.lngLat;
-                propose(spotAt(target, event.point) ?? point({ latitude: lat, longitude: lng }));
-            }
-        });
-
-        // ---- adding (Shift held, on Earth) ----
-
-        // Shift + click adds a city: snapped to a city under the cursor (named in a hint), otherwise the point itself;
-        // NOTE: Shift + drag (box zoom of Mapbox) is off, as it would compete
-        target.boxZoom.disable();
+        // over a city (snapped): crosshair and a hint, a click adds it;
+        // anywhere: right-click or long-press opens a menu to add a city at the point
         let cursor: mapboxgl.Point | undefined;
+        let opened = 0;
 
-        const hover = (shift: boolean) => {
-            const at = shift && ready.current ? cursor : undefined;
-            const spot = at && spotAt(target, at);
-            target.getCanvas().style.cursor = at ? "crosshair" : "";
+        const hover = () => {
+            const spot = ready.current && cursor ? spotAt(target, cursor) : undefined;
+            target.getCanvas().style.cursor = spot ? "crosshair" : "";
 
             if (!spot) {
                 hint.current.remove();
                 return;
             }
 
-            hint.current.setLngLat(lngLat(spot)).setText([spot.name, spot.country].filter(Boolean).join(", "));
+            hint.current.setLngLat(lngLat(spot)).setText(`Add ${[spot.name, spot.country].filter(Boolean).join(", ")}`);
 
             if (!hint.current.isOpen()) {
                 hint.current.addTo(target);
             }
         };
 
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === "Shift") {
-                hover(event.type === "keydown");
+        const open = (at: mapboxgl.LngLat) => {
+            if (!ready.current) {
+                return;
+            }
+
+            hint.current.remove();
+            opened = Date.now();
+            const item = document.createElement("button");
+            item.type = "button";
+            item.textContent = "Add a city here";
+            item.addEventListener("click", () => {
+                menu.current.remove();
+                propose(point({ latitude: at.lat, longitude: at.lng }));
+            });
+            menu.current.setLngLat(at).setDOMContent(item);
+
+            if (!menu.current.isOpen()) {
+                menu.current.addTo(target);
             }
         };
-        const onBlur = () => hover(false);
+
+        // a click on the map itself (not on a marker or the popup) deselects, which closes the popup;
+        // on a city it adds the city (not right after a long-press, whose release may count as a click)
+        target.on("click", (event) => {
+            if (event.originalEvent.target !== target.getCanvas() || Date.now() - opened < PRESS) {
+                return;
+            }
+
+            select();
+            const spot = ready.current ? spotAt(target, event.point) : undefined;
+
+            if (spot) {
+                propose(spot);
+            }
+        });
 
         target.on("mousemove", (event) => {
-            const { originalEvent } = event;
-            cursor = event.point;
-            hover(originalEvent.shiftKey && originalEvent.buttons === 0);
+            cursor = event.originalEvent.buttons === 0 ? event.point : undefined;
+            hover();
         });
         target.on("mouseout", () => {
             cursor = undefined;
-            hover(false);
+            hover();
         });
-        window.addEventListener("keydown", onKey);
-        window.addEventListener("keyup", onKey);
-        window.addEventListener("blur", onBlur);
+        target.on("contextmenu", (event) => open(event.lngLat));
+
+        // long-press (touch): one finger, held still
+        let press: ReturnType<typeof setTimeout> | undefined;
+        let start: mapboxgl.Point | undefined;
+
+        const release = () => {
+            clearTimeout(press);
+            start = undefined;
+        };
+
+        target.on("touchstart", (event) => {
+            release();
+
+            if (event.originalEvent.touches.length === 1) {
+                const { lngLat } = event;
+                start = event.point;
+                press = setTimeout(() => open(lngLat), PRESS);
+            }
+        });
+        target.on("touchmove", (event) => {
+            if (start && event.point.dist(start) > SLOP) {
+                release();
+            }
+        });
+        target.on("touchend", release);
+        target.on("touchcancel", release);
 
         // marker size via a CSS variable, so markers need no update of their own
 
@@ -190,9 +232,7 @@ export function MapView() {
         });
 
         return () => {
-            window.removeEventListener("keydown", onKey);
-            window.removeEventListener("keyup", onKey);
-            window.removeEventListener("blur", onBlur);
+            release();
             observer.disconnect();
             map.current?.remove();
         };
@@ -214,6 +254,7 @@ export function MapView() {
             ready.current = false;
             target.getCanvas().style.cursor = "";
             hint.current.remove();
+            menu.current.remove();
             // full reload (no diff), so "style.load" fires and re-applies light preset and theme
             // NOTE: cast, as the typings of mapbox-gl wrongly require the font options
             target.setStyle(styleOf({ body, style }), { diff: false } as Parameters<mapboxgl.Map["setStyle"]>[1]);
