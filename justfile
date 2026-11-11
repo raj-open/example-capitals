@@ -50,7 +50,8 @@ models: _deps
 upgrade:
     npm update
 
-# follow the lock file; rewrite it only if a manifest changed
+# follow the lock file; rewrite it only if a manifest changed;
+# reinstall if an install did not finish (npm writes node_modules/.package-lock.json last) or the lock file changed
 _deps:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -59,7 +60,8 @@ _deps:
         || [ backend/package.json -nt package-lock.json ] \
         || [ frontend/package.json -nt package-lock.json ]; then
         npm install
-    elif [ ! -d node_modules ]; then
+    elif [ ! -f node_modules/.package-lock.json ] \
+        || [ package-lock.json -nt node_modules/.package-lock.json ]; then
         npm ci
     fi
 
