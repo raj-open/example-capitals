@@ -4,6 +4,9 @@
  *
  * Clicking a marker selects its capital (GET /capital/{name});
  * the map then flies to the selected capital and opens a popup to change the colour of its marker.
+ * On Earth, a right-click (long-press on touch devices which support it) proposes a city to add:
+ * it snaps to a place label of the map and to known places (see /frontend/src/utils/snap.ts),
+ * marks the spot with a pin and opens the form in the sidebar, prefilled; a stored city is selected instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
  */
@@ -18,10 +21,13 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import type { Capital } from "../../@api/types.gen.ts";
+import { places } from "../data/places.ts";
 import { DEFAULT_COLOUR, useCapitals } from "../store/capital.ts";
 import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
 import { markerSize } from "../utils/markers.ts";
+import type { Spot } from "../utils/snap.ts";
+import { snap } from "../utils/snap.ts";
 import { CapitalPopup } from "./CapitalPopup.tsx";
 import { DataActions } from "./DataActions.tsx";
 import { MapSettings } from "./MapSettings.tsx";
@@ -38,6 +44,9 @@ const ZOOM = 5;
 const DEPARTURE = 700;
 const ARRIVAL = 4000;
 
+/** ids of the interactions which propose a city (on a place label, elsewhere) */
+const PROPOSE = { label: "propose-label", point: "propose-point" } as const;
+
 // ----------------------------------------------------------------
 // COMPONENTS
 // ----------------------------------------------------------------
@@ -50,10 +59,13 @@ export function MapView() {
     const style = useMapStyle((state) => state.style);
     const lightPreset = useMapStyle((state) => state.lightPreset);
     const theme = useMapStyle((state) => state.theme);
+    const draft = useCapitals((state) => state.draft);
+    const propose = useCapitals((state) => state.propose);
 
     const element = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map>(null);
     const markers = useRef(new Map<string, mapboxgl.Marker>());
+    const pin = useRef<mapboxgl.Marker>(null);
     const content = useRef(document.createElement("div"));
     const popup = useRef(new mapboxgl.Popup({ offset: 20, closeOnClick: false, maxWidth: "none" }));
     const loaded = useRef(keyOf(useMapStyle.getState()));
@@ -106,6 +118,7 @@ export function MapView() {
 
             if (ready.current) {
                 applyAppearance(target, appearance);
+                listen(target);
             }
         });
 
@@ -129,6 +142,7 @@ export function MapView() {
         const other = body !== "earth";
         const load = () => {
             ready.current = false;
+            unlisten(target);
             // full reload (no diff), so "style.load" fires and re-applies light preset and theme
             // NOTE: cast, as the typings of mapbox-gl wrongly require the font options
             target.setStyle(styleOf({ body, style }), { diff: false } as Parameters<mapboxgl.Map["setStyle"]>[1]);
@@ -138,6 +152,7 @@ export function MapView() {
 
         if (other) {
             select();
+            propose();
         }
 
         // another world: a (fake) flyby; otherwise (basemap on Earth) a plain switch
@@ -167,7 +182,7 @@ export function MapView() {
                 show(target, popup.current, useCapitals.getState().selected);
             }
         });
-    }, [body, style, select]);
+    }, [body, style, select, propose]);
 
     // light preset and theme are client-side config: no requests
     useEffect(() => {
@@ -216,6 +231,19 @@ export function MapView() {
             paint(marker.getElement(), item, item.id === selected?.id);
         }
     }, [items, selected, select]);
+
+    // ---- draft (a city proposed to add) ----
+
+    useEffect(() => {
+        pin.current?.remove();
+        pin.current = null;
+
+        if (map.current && draft) {
+            pin.current = new mapboxgl.Marker({ color: DEFAULT_COLOUR })
+                .setLngLat([draft.longitude, draft.latitude])
+                .addTo(map.current);
+        }
+    }, [draft]);
 
     // ---- selection ----
 
@@ -325,7 +353,49 @@ function show(map: mapboxgl.Map, popup: mapboxgl.Popup, selected: Capital | unde
     }
 }
 
-function lngLat({ longitude, latitude }: Capital): [number, number] {
+/**
+ * Right-click proposes a city (only on Earth: added on each load of a Mapbox style, removed before a switch):
+ * on a place label of Mapbox Standard (featureset `place-labels`) with its name, elsewhere the point itself.
+ * NOTE: the interaction on the label stops the event, so the one without target only handles the rest
+ */
+function listen(map: mapboxgl.Map) {
+    unlisten(map);
+
+    map.addInteraction(PROPOSE.label, {
+        type: "contextmenu",
+        target: { featuresetId: "place-labels", importId: "basemap" },
+        handler: (event) => {
+            const { feature } = event;
+            const name = feature?.properties.name;
+
+            if (feature?.geometry.type !== "Point" || typeof name !== "string") {
+                return false;
+            }
+
+            const [longitude, latitude] = feature.geometry.coordinates;
+            proposeAt(map, { name, latitude, longitude });
+        },
+    });
+
+    map.addInteraction(PROPOSE.point, {
+        type: "contextmenu",
+        handler: (event) => proposeAt(map, { latitude: event.lngLat.lat, longitude: event.lngLat.lng }),
+    });
+}
+
+function unlisten(map: mapboxgl.Map) {
+    map.removeInteraction(PROPOSE.label);
+    map.removeInteraction(PROPOSE.point);
+}
+
+function proposeAt(map: mapboxgl.Map, spot: Spot) {
+    const { items, propose } = useCapitals.getState();
+    const project = ({ longitude, latitude }: Spot) => map.project([longitude, latitude]);
+
+    propose(snap(spot, places(items), project));
+}
+
+function lngLat({ longitude, latitude }: Spot): [number, number] {
     return [longitude, latitude];
 }
 

@@ -4,7 +4,8 @@
  * - search by country and by city (separately, both narrow down): only matches are shown;
  *   ↑/↓ cycle through matches, Enter selects, Esc clears
  * - selecting an entry selects the city (GET /capital/{id}), which moves the map there
- * - per entry: colour dot (= marker colour), edit and delete; add via + in the header
+ * - per entry: colour dot (= marker colour), edit and delete; add via + in the header,
+ *   or via a right-click on the map (the form opens prefilled, see /frontend/src/utils/snap.ts)
  * - grouped by country (name only on the first entry of a group), the capital first
  * - "Capitals only" (default, remembered): /capital; otherwise /city (all cities, capitals marked with a star)
  */
@@ -37,7 +38,7 @@ const EMPTY: Query = { country: "", name: "" };
 // ----------------------------------------------------------------
 
 export function CapitalList() {
-    const { items, selected, error, select, add, edit, remove } = useCapitals();
+    const { items, selected, draft, error, select, add, edit, remove, propose } = useCapitals();
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const setSettings = useSettings((state) => state.set);
     const title = capitalsOnly ? "Capitals" : "Cities";
@@ -59,6 +60,26 @@ export function CapitalList() {
         return searching ? items.filter(({ id }) => ids.has(id)) : items;
     }, [items, matches, searching]);
     const noun = capitalsOnly ? "capital" : "city";
+
+    // ---- draft (proposed on the map) ----
+
+    useEffect(() => {
+        if (draft) {
+            setCollapsed(false);
+            setEditing(NEW);
+        }
+    }, [draft]);
+
+    /** opens a form (to add or edit) without a draft */
+    function open(id: string) {
+        propose();
+        setEditing(id);
+    }
+
+    function close() {
+        setEditing(undefined);
+        propose();
+    }
 
     // ---- scrolling ----
 
@@ -135,7 +156,7 @@ export function CapitalList() {
             <header>
                 <div className="sidebar-title">
                     <h2>{title}</h2>
-                    <button type="button" title="Add" aria-label="Add capital" onClick={() => setEditing(NEW)}>
+                    <button type="button" title="Add" aria-label="Add capital" onClick={() => open(NEW)}>
                         <Plus />
                     </button>
                     <button
@@ -172,10 +193,14 @@ export function CapitalList() {
                 {(problem ?? error) && <p className="error">{problem ?? error}</p>}
                 {editing === NEW && (
                     <CapitalForm
-                        onCancel={() => setEditing(undefined)}
+                        // a new draft (another spot on the map) refills the form
+                        key={draft ? `${draft.latitude},${draft.longitude}` : NEW}
+                        initial={draft}
+                        action="Add"
+                        onCancel={close}
                         onSubmit={async (input) => {
                             const item = await add(input);
-                            setEditing(undefined);
+                            close();
                             await select(item.id);
                         }}
                     />
@@ -187,6 +212,7 @@ export function CapitalList() {
                         <li key={item.id}>
                             <CapitalForm
                                 initial={item}
+                                action="Save"
                                 onCancel={() => setEditing(undefined)}
                                 onSubmit={async (input) => {
                                     await edit(item.id, input);
@@ -212,7 +238,7 @@ export function CapitalList() {
                                 }
                             }}
                             onSelect={() => select(item.id)}
-                            onEdit={() => setEditing(item.id)}
+                            onEdit={() => open(item.id)}
                             onDelete={() => onDelete(item.id, `${item.name}, ${item.country}`)}
                         />
                     ),

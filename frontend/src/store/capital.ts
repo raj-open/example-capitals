@@ -12,6 +12,7 @@ import type { Capital, CapitalInput } from "../../@api/types.gen.ts";
 import type { Resource } from "../api/capital.ts";
 import * as api from "../api/capital.ts";
 import { LOCALE } from "../utils/locale.ts";
+import type { Spot } from "../utils/snap.ts";
 import { useSettings } from "./settings.ts";
 
 // ----------------------------------------------------------------
@@ -33,6 +34,8 @@ const pending = new Map<string, ReturnType<typeof setTimeout>>();
 export interface CapitalState {
     items: Capital[];
     selected?: Capital;
+    /** a city to add, proposed on the map (opens the form, prefilled) */
+    draft?: Spot;
     error?: string;
 
     load: () => Promise<void>;
@@ -41,6 +44,7 @@ export interface CapitalState {
     edit: (id: string, input: CapitalInput) => Promise<Capital>;
     remove: (id: string) => Promise<void>;
     setColour: (id: string, colour: string) => void;
+    propose: (draft?: Spot) => void;
 }
 
 // ----------------------------------------------------------------
@@ -147,6 +151,19 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
                 }
             }, SAVE_DELAY),
         );
+    },
+
+    /**
+     * Proposes a city to add; a stored one is selected instead. No draft withdraws the proposal.
+     */
+    propose: (draft) => {
+        if (draft?.id !== undefined) {
+            set({ draft: undefined });
+            get().select(draft.id);
+            return;
+        }
+
+        set({ draft });
     },
 }));
 

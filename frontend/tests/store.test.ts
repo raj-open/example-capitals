@@ -16,7 +16,7 @@ vi.mock("../src/api/capital.ts");
 
 describe("useCapitals", () => {
     beforeEach(() => {
-        useCapitals.setState({ items: [], selected: undefined, error: undefined });
+        useCapitals.setState({ items: [], selected: undefined, draft: undefined, error: undefined });
         useSettings.setState({ capitalsOnly: true });
     });
 
@@ -136,5 +136,25 @@ describe("useCapitals", () => {
             colour: "#ff0000",
         });
         vi.useRealTimers();
+    });
+
+    it("proposes a new city and withdraws it", () => {
+        const draft = { name: "Lyon", country: "France", latitude: 45.76, longitude: 4.84 };
+
+        useCapitals.getState().propose(draft);
+        expect(useCapitals.getState().draft).toEqual(draft);
+
+        useCapitals.getState().propose();
+        expect(useCapitals.getState().draft).toBeUndefined();
+    });
+
+    it("selects a stored city instead of proposing it", async () => {
+        const paris = { id: "1", name: "Paris", country: "France", latitude: 48.86, longitude: 2.35, capital: true };
+        vi.mocked(api.get).mockResolvedValue(paris);
+        useCapitals.setState({ draft: { latitude: 0, longitude: 0 } });
+
+        useCapitals.getState().propose(paris);
+        await vi.waitFor(() => expect(useCapitals.getState().selected).toEqual(paris));
+        expect(useCapitals.getState().draft).toBeUndefined();
     });
 });
