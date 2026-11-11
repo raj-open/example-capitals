@@ -3,8 +3,12 @@
  *
  * - search by country and by city (separately, both narrow down): only matches are shown;
  *   ↑/↓ cycle through matches, Enter selects, Esc clears
- * - selecting an entry selects the city (GET /capital/{id}), which moves the map there
- * - per entry: colour dot (= marker colour), edit and delete; add via + in the header
+ * - selecting an entry selects the city (GET /capital/{id}), which moves the map there;
+ *   Ctrl/Cmd + click adds or removes one, Shift + click a range (of the entries shown); "Select all" takes all matches;
+ *   with several selected, a bar offers one colour for all and delete (see SelectionBar)
+ * - the list (and the map) can be limited to the countries of the selection (via the bar); "Show all" or Esc ends it
+ * - per entry: colour dot (= marker colour), edit and delete; add via + in the header,
+ *   or via the map: a click on a city, or right-click / long-press anywhere (the form opens prefilled, see /frontend/src/components/MapView.tsx)
  * - grouped by country (name only on the first entry of a group), the capital first
  * - "Capitals only" (default, remembered): /capital; otherwise /city (all cities, capitals marked with a star)
  */
@@ -15,20 +19,18 @@
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { useCapitals } from "../store/capital.ts";
+import { NEW, selectingOf, useCapitals, visible } from "../store/capital.ts";
 import { useSettings } from "../store/settings.ts";
 import { LOCALE } from "../utils/locale.ts";
 import { type Query, search } from "../utils/search.ts";
 import { CapitalForm } from "./CapitalForm.tsx";
 import { CapitalItem } from "./CapitalItem.tsx";
 import { Chevron, Plus } from "./icons.tsx";
+import { SelectionBar } from "./SelectionBar.tsx";
 
 // ----------------------------------------------------------------
 // LOCAL CONSTANTS
 // ----------------------------------------------------------------
-
-/** value of `editing` for the form of a new capital */
-const NEW = "new";
 
 const EMPTY: Query = { country: "", name: "" };
 
@@ -37,13 +39,28 @@ const EMPTY: Query = { country: "", name: "" };
 // ----------------------------------------------------------------
 
 export function CapitalList() {
-    const { items, selected, error, select, add, edit, remove } = useCapitals();
+    const {
+        items: all,
+        countries,
+        selected,
+        selection,
+        draft,
+        editing,
+        error,
+        select,
+        selectAll,
+        add,
+        edit,
+        remove,
+        setEditing,
+        showCountries,
+    } = useCapitals();
+    const items = useMemo(() => visible(all, countries), [all, countries]);
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const setSettings = useSettings((state) => state.set);
     const title = capitalsOnly ? "Capitals" : "Cities";
 
     const [collapsed, setCollapsed] = useState(false);
-    const [editing, setEditing] = useState<string>(); // id, or NEW
     const [problem, setProblem] = useState<string>();
     const [query, setQuery] = useState<Query>(EMPTY);
     const [index, setIndex] = useState(0);
@@ -59,6 +76,25 @@ export function CapitalList() {
         return searching ? items.filter(({ id }) => ids.has(id)) : items;
     }, [items, matches, searching]);
     const noun = capitalsOnly ? "capital" : "city";
+
+    // ---- forms (also opened from the map) ----
+
+    useEffect(() => {
+        if (editing !== undefined) {
+            setCollapsed(false);
+        }
+    }, [editing]);
+
+    const close = () => setEditing();
+
+    /** keeps the node of an entry (or its form), for scrolling */
+    const keep = (id: string) => (node: HTMLLIElement | null) => {
+        if (node) {
+            nodes.current.set(id, node);
+        } else {
+            nodes.current.delete(id);
+        }
+    };
 
     // ---- scrolling ----
 
@@ -81,7 +117,12 @@ export function CapitalList() {
         } else if (event.key === "Enter" && active !== undefined) {
             select(active);
         } else if (event.key === "Escape") {
-            setQuery(EMPTY);
+            // first the search, then the limit to countries
+            if (searching) {
+                setQuery(EMPTY);
+            } else {
+                showCountries([]);
+            }
         }
     }
 
@@ -158,6 +199,11 @@ export function CapitalList() {
                             ? `${matches.length === 0 ? 0 : (index % matches.length) + 1} / ${count(matches.length, "match", "matches")}`
                             : count(items.length, noun, capitalsOnly ? "capitals" : "cities")}
                     </small>
+                    {searching && matches.length > 1 && (
+                        <button type="button" className="link" onClick={() => selectAll(shown.map(({ id }) => id))}>
+                            Select all
+                        </button>
+                    )}
                     <label className="sidebar-switch">
                         <input
                             type="checkbox"
@@ -169,13 +215,33 @@ export function CapitalList() {
                         Capitals only
                     </label>
                 </div>
+                {countries.length > 0 && (
+                    <div className="sidebar-filter">
+                        <small>Only: {countries.join(", ")}</small>
+                        <button type="button" className="link" onClick={() => showCountries([])}>
+                            Show all
+                        </button>
+                    </div>
+                )}
+                <SelectionBar />
                 {(problem ?? error) && <p className="error">{problem ?? error}</p>}
                 {editing === NEW && (
                     <CapitalForm
-                        onCancel={() => setEditing(undefined)}
+                        // a new draft (another spot on the map) refills the form
+                        key={draft ? `${draft.latitude},${draft.longitude}` : NEW}
+                        // a city from the map is not a capital, unless chosen (a stored capital is selected instead)
+                        initial={draft && { capital: false, ...draft }}
+                        action="Add"
+                        onCancel={close}
                         onSubmit={async (input) => {
                             const item = await add(input);
-                            setEditing(undefined);
+                            close();
+
+                            // an ordinary city added with "Capitals only": show all cities, so it is listed
+                            if (capitalsOnly && !item.capital) {
+                                setSettings({ capitalsOnly: false });
+                            }
+
                             await select(item.id);
                         }}
                     />
@@ -184,13 +250,14 @@ export function CapitalList() {
             <ul>
                 {shown.map((item, i) =>
                     editing === item.id ? (
-                        <li key={item.id}>
+                        <li key={item.id} ref={keep(item.id)}>
                             <CapitalForm
                                 initial={item}
-                                onCancel={() => setEditing(undefined)}
+                                action="Save"
+                                onCancel={close}
                                 onSubmit={async (input) => {
                                     await edit(item.id, input);
-                                    setEditing(undefined);
+                                    close();
                                 }}
                             />
                         </li>
@@ -201,17 +268,17 @@ export function CapitalList() {
                             first={i === 0 || shown[i - 1].country !== item.country}
                             current={item.id === selected?.id}
                             className={classes({
-                                selected: item.id === selected?.id,
+                                selected: selection.includes(item.id),
                                 active: searching && item.id === active,
                             })}
-                            ref={(node) => {
-                                if (node) {
-                                    nodes.current.set(item.id, node);
-                                } else {
-                                    nodes.current.delete(item.id);
-                                }
-                            }}
-                            onSelect={() => select(item.id)}
+                            ref={keep(item.id)}
+                            onSelect={(event) =>
+                                select(
+                                    item.id,
+                                    selectingOf(event),
+                                    shown.map(({ id }) => id),
+                                )
+                            }
                             onEdit={() => setEditing(item.id)}
                             onDelete={() => onDelete(item.id, `${item.name}, ${item.country}`)}
                         />

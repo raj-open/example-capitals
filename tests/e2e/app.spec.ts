@@ -34,7 +34,7 @@ test("shows the list of capitals", async ({ page }) => {
     await expect(page.getByRole("heading", { name: "Capitals" })).toBeVisible();
 });
 
-test("shows a 32px × 32px marker per capital, with a popup to change its colour and to delete it", async ({
+test("shows a 32px × 32px marker per capital, with a popup (colour, delete) and its form to edit", async ({
     page,
     request,
 }) => {
@@ -46,9 +46,13 @@ test("shows a 32px × 32px marker per capital, with a popup to change its colour
     const marker = page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`);
     await marker.click();
 
-    // the map flies there (close up: 32px), the popup opens
-    const popup = page.locator(".mapboxgl-popup");
+    // the map flies there (close up: 32px), the popup opens (not the hint or the menu, also popups of mapbox-gl)
+    const popup = page.locator(".mapboxgl-popup", { has: page.locator(".popup") });
     await expect(popup).toContainText(`${NAME}, ${COUNTRY}`);
+
+    // the sidebar opens the city to edit
+    const form = page.locator(".sidebar .capital-form");
+    await expect(form.getByRole("textbox", { name: "City" })).toHaveValue(NAME);
     await expect.poll(async () => (await marker.boundingBox())?.width, { timeout: 10_000 }).toBeCloseTo(32, 0);
     expect((await marker.boundingBox())?.height).toBeCloseTo(32, 0);
 
@@ -64,6 +68,7 @@ test("shows a 32px × 32px marker per capital, with a popup to change its colour
     await popup.getByRole("button", { name: `Delete ${NAME}` }).click();
     await expect(marker).toHaveCount(0);
     await expect(page.locator(".sidebar .entry", { hasText: NAME })).toHaveCount(0);
+    await expect(form).toHaveCount(0);
 });
 
 test("adds, edits and deletes a capital", async ({ page }) => {
@@ -91,6 +96,61 @@ test("adds, edits and deletes a capital", async ({ page }) => {
         .click();
     await expect(page.locator(".sidebar .entry", { hasText: RENAMED })).toHaveCount(0);
     await expect(page.locator(`.marker[title="${RENAMED}, ${COUNTRY}"]`)).toHaveCount(0);
+});
+
+test("selects several (Ctrl/Cmd + click, or all matches): their countries only, one colour, delete", async ({
+    page,
+    request,
+}) => {
+    // two capitals (of different countries, as a country has at most one)
+    for (const [name, country, longitude] of [
+        [NAME, COUNTRY, 0],
+        [RENAMED, `${COUNTRY} 2`, 5],
+    ] as const) {
+        const response = await request.post("/api/capital", { data: { name, country, latitude: -20, longitude } });
+        expect(response.status()).toBe(201);
+    }
+
+    await page.goto("/");
+    const entry = (name: string) => page.locator(".sidebar .entry", { hasText: name });
+    const bar = page.getByRole("toolbar", { name: "Selected cities" });
+
+    // click, then Ctrl/Cmd + click: both selected (list and map)
+    await entry(NAME).click();
+    await entry(RENAMED).click({ modifiers: ["ControlOrMeta"] });
+    await expect(bar).toContainText("2 selected");
+    await expect(page.locator(".marker.selected")).toHaveCount(2);
+
+    // clear, then all matches of a search
+    await bar.getByRole("button", { name: "Clear" }).click();
+    await expect(bar).toHaveCount(0);
+    await page.getByRole("searchbox", { name: "Search by country" }).fill(COUNTRY);
+    await page.getByRole("button", { name: "Select all" }).click();
+    await expect(bar).toContainText("2 selected");
+
+    // only their countries (list and map), then all again
+    await page.getByRole("searchbox", { name: "Search by country" }).fill("");
+    await bar.getByRole("button", { name: "Only these countries" }).click();
+    await expect(page.locator(".sidebar .entry")).toHaveCount(2);
+    await expect(page.locator(".marker")).toHaveCount(2);
+    await page.getByRole("button", { name: "Show all" }).click();
+    await expect(page.locator(".sidebar-filter")).toHaveCount(0);
+
+    // one colour for all, undone
+    await bar.locator('input[type="color"]').fill("#00aa55");
+    await expect(page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`)).toHaveCSS("background-color", "rgb(0, 170, 85)");
+    await bar.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`)).not.toHaveCSS(
+        "background-color",
+        "rgb(0, 170, 85)",
+    );
+
+    // delete both at once
+    page.once("dialog", (dialog) => dialog.accept());
+    await bar.getByRole("button", { name: "Delete selected" }).click();
+    await expect(entry(NAME)).toHaveCount(0);
+    await expect(entry(RENAMED)).toHaveCount(0);
+    await expect(page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`)).toHaveCount(0);
 });
 
 test.describe("on a phone", () => {

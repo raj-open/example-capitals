@@ -6,7 +6,7 @@
 // IMPORTS
 // ----------------------------------------------------------------
 
-import type { Ref } from "react";
+import type { MouseEvent, Ref } from "react";
 
 import type { Capital } from "../../@api/types.gen.ts";
 import { DEFAULT_COLOUR, useCapitals } from "../store/capital.ts";
@@ -34,7 +34,7 @@ export function CapitalItem({
     className?: string;
     current: boolean;
     ref: Ref<HTMLLIElement>;
-    onSelect: () => void;
+    onSelect: (event: MouseEvent) => void;
     onEdit: () => void;
     onDelete: () => void;
 }) {

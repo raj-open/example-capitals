@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../src/api/capital.ts";
-import { useCapitals } from "../src/store/capital.ts";
+import { NEW, selectingOf, useCapitals, visible } from "../src/store/capital.ts";
 import { useSettings } from "../src/store/settings.ts";
 
 // ----------------------------------------------------------------
@@ -16,7 +16,16 @@ vi.mock("../src/api/capital.ts");
 
 describe("useCapitals", () => {
     beforeEach(() => {
-        useCapitals.setState({ items: [], selected: undefined, error: undefined });
+        useCapitals.setState({
+            items: [],
+            selected: undefined,
+            selection: [],
+            anchor: undefined,
+            countries: [],
+            draft: undefined,
+            editing: undefined,
+            error: undefined,
+        });
         useSettings.setState({ capitalsOnly: true });
     });
 
@@ -136,5 +145,158 @@ describe("useCapitals", () => {
             colour: "#ff0000",
         });
         vi.useRealTimers();
+    });
+
+    it("adds an ordinary city via /city even with capitals only, without listing it", async () => {
+        const lyon = { id: "2", name: "Lyon", country: "France", latitude: 45.76, longitude: 4.84, capital: false };
+        vi.mocked(api.create).mockClear().mockResolvedValue(lyon);
+
+        const { id: _, ...input } = lyon;
+        expect(await useCapitals.getState().add(input)).toEqual(lyon);
+        expect(api.create).toHaveBeenCalledWith("city", input);
+        expect(useCapitals.getState().items).toEqual([]);
+    });
+
+    it("proposes a new city and withdraws it", () => {
+        const draft = { name: "Lyon", country: "France", latitude: 45.76, longitude: 4.84 };
+
+        useCapitals.getState().propose(draft);
+        expect(useCapitals.getState().draft).toEqual(draft);
+        expect(useCapitals.getState().editing).toBe(NEW);
+
+        useCapitals.getState().propose();
+        expect(useCapitals.getState().draft).toBeUndefined();
+        expect(useCapitals.getState().editing).toBeUndefined();
+    });
+
+    it("drops the draft when another form opens", () => {
+        useCapitals.getState().propose({ latitude: 0, longitude: 0 });
+        useCapitals.getState().setEditing("1");
+
+        expect(useCapitals.getState().draft).toBeUndefined();
+        expect(useCapitals.getState().editing).toBe("1");
+    });
+
+    it("selects a stored city and opens it to edit instead of proposing it", async () => {
+        const paris = { id: "1", name: "Paris", country: "France", latitude: 48.86, longitude: 2.35, capital: true };
+        vi.mocked(api.get).mockResolvedValue(paris);
+        useCapitals.setState({ draft: { latitude: 0, longitude: 0 } });
+
+        useCapitals.getState().propose(paris);
+        await vi.waitFor(() => expect(useCapitals.getState().selected).toEqual(paris));
+        expect(useCapitals.getState().draft).toBeUndefined();
+        expect(useCapitals.getState().editing).toBe("1");
+    });
+
+    // ---- several selected ----
+
+    describe("selection", () => {
+        const city = (id: string) => ({ id, name: id, country: "X", latitude: 0, longitude: 0, capital: false });
+        const ORDER = ["a", "b", "c", "d"];
+
+        beforeEach(() => {
+            useCapitals.setState({ items: ORDER.map(city) });
+            vi.mocked(api.get).mockImplementation(async (_, id) => city(id));
+        });
+
+        it("selects one, toggles others, and a range from the last click without Shift", async () => {
+            const { select } = useCapitals.getState();
+
+            await select("b");
+            await select("d", "toggle");
+            expect(useCapitals.getState().selection).toEqual(["b", "d"]);
+            expect(useCapitals.getState().selected?.id).toBe("d");
+
+            await select("b", "toggle");
+            expect(useCapitals.getState().selection).toEqual(["d"]);
+
+            // from b (toggled last)
+            await select("a", "range");
+            expect(useCapitals.getState().selection).toEqual(["a", "b"]);
+
+            await select("c");
+            await select("a", "range", ["c", "a"]);
+            expect(useCapitals.getState().selection).toEqual(["c", "a"]);
+        });
+
+        it("drops the focus of a city toggled off, and keeps the selection on blur", async () => {
+            const { select } = useCapitals.getState();
+
+            await select("a");
+            await select("b", "toggle");
+            await select("b", "toggle");
+            expect(useCapitals.getState().selected).toBeUndefined();
+
+            await select("c", "toggle");
+            useCapitals.getState().blur();
+            expect(useCapitals.getState().selected).toBeUndefined();
+            expect(useCapitals.getState().selection).toEqual(["a", "c"]);
+
+            await select();
+            expect(useCapitals.getState().selection).toEqual([]);
+        });
+
+        it("drops a city proposed on the map (and its form) when selecting, silently", async () => {
+            useCapitals.getState().propose({ latitude: 0, longitude: 0 });
+            await useCapitals.getState().select("a");
+            expect(useCapitals.getState().draft).toBeUndefined();
+            expect(useCapitals.getState().editing).toBeUndefined();
+
+            useCapitals.getState().propose({ latitude: 0, longitude: 0 });
+            useCapitals.getState().selectAll(["a"]);
+            expect(useCapitals.getState().draft).toBeUndefined();
+        });
+
+        it("selects all given, without focus", () => {
+            useCapitals.getState().selectAll(["a", "c"]);
+            expect(useCapitals.getState().selection).toEqual(["a", "c"]);
+            expect(useCapitals.getState().selected).toBeUndefined();
+        });
+
+        it("deletes several; those deleted are gone even if one fails", async () => {
+            useCapitals.setState({ selection: ["a", "b", "c"] });
+            vi.mocked(api.remove).mockImplementation(async (_, id) => {
+                if (id === "b") {
+                    throw new Error("409");
+                }
+            });
+
+            await expect(useCapitals.getState().removeMany(["a", "b", "c"])).rejects.toThrow("409");
+            expect(useCapitals.getState().items.map(({ id }) => id)).toEqual(["b", "d"]);
+            expect(useCapitals.getState().selection).toEqual(["b"]);
+        });
+
+        it("limits to countries (deselecting cities outside), and shows all again", () => {
+            useCapitals.setState({
+                items: [city("a"), { ...city("b"), country: "Y" }, { ...city("c"), country: "Z" }],
+                selection: ["a", "b", "c"],
+            });
+
+            useCapitals.getState().showCountries(["X", "Y", "X"]);
+            expect(useCapitals.getState().countries).toEqual(["X", "Y"]);
+            expect(useCapitals.getState().selection).toEqual(["a", "b"]);
+            expect(visible(useCapitals.getState().items, ["Y"]).map(({ id }) => id)).toEqual(["b"]);
+
+            useCapitals.getState().showCountries([]);
+            expect(visible(useCapitals.getState().items, []).length).toBe(3);
+        });
+
+        it("removes a colour (back to the default)", () => {
+            vi.useFakeTimers();
+            useCapitals.setState({ items: [{ ...city("a"), colour: "#00ff00" }] });
+
+            useCapitals.getState().setColour("a", undefined);
+            expect(useCapitals.getState().items[0].colour).toBeUndefined();
+            vi.useRealTimers();
+        });
+
+        it.each([
+            [{ ctrlKey: true, metaKey: false, shiftKey: false }, "toggle"],
+            [{ ctrlKey: false, metaKey: true, shiftKey: true }, "toggle"],
+            [{ ctrlKey: false, metaKey: false, shiftKey: true }, "range"],
+            [{ ctrlKey: false, metaKey: false, shiftKey: false }, "only"],
+        ])("modifiers %o → %s", (event, how) => {
+            expect(selectingOf(event)).toBe(how);
+        });
     });
 });

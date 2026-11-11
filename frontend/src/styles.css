@@ -208,6 +208,22 @@ input {
     gap: 0.5rem;
 }
 
+/* "Select all" (while searching), "Show all" (limited to countries): buttons that look like links */
+.sidebar .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+/* Shift + click selects a range, not text */
+.sidebar .entry {
+    user-select: none;
+}
+
 /* switch: capitals only */
 .sidebar .sidebar-switch {
     display: flex;
@@ -505,6 +521,36 @@ input {
     font-size: 0.8rem;
 }
 
+/* hint over a city which can be added (crosshair); it must not catch the click */
+.map .mapboxgl-popup.hint {
+    pointer-events: none;
+}
+
+.map .hint .mapboxgl-popup-content {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* menu of right-click or long-press: "Add a city here" */
+.map .menu .mapboxgl-popup-content {
+    padding: 0.25rem;
+}
+
+.map .menu button {
+    padding: 0.35rem 0.6rem;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.map .menu button:hover,
+.map .menu button:focus-visible {
+    background: var(--subtle);
+}
+
 /* ---------------------------------------------------------------- */
 /* map controls: permanent round buttons (top right, stacked); each panel opens to the left of its button */
 /* ---------------------------------------------------------------- */
@@ -758,4 +804,61 @@ input {
     .map .mapboxgl-popup-content {
         max-width: calc(100vw - 3rem);
     }
+}
+
+/* ---------------------------------------------------------------- */
+/* limited to some countries: which, and "Show all" */
+.sidebar .sidebar-filter {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+/* actions for the selected cities */
+.sidebar .selection-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.35rem 0.6rem;
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    background: var(--selected);
+    font-size: 0.85rem;
+}
+
+.sidebar .selection-bar > span {
+    flex: 1;
+}
+
+.sidebar .selection-bar label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+/* as in the form (not a round search field) */
+.sidebar .selection-bar input[type="color"] {
+    width: 2.25rem;
+    height: 1.5rem;
+    padding: 0.1rem;
+    border-radius: 0.4rem;
+    background: none;
+    cursor: pointer;
+}
+
+.sidebar .selection-bar button {
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.sidebar .selection-bar .error {
+    flex-basis: 100%;
+    margin: 0;
 }
