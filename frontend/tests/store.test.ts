@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../src/api/capital.ts";
-import { NEW, useCapitals } from "../src/store/capital.ts";
+import { NEW, selectingOf, useCapitals } from "../src/store/capital.ts";
 import { useSettings } from "../src/store/settings.ts";
 
 // ----------------------------------------------------------------
@@ -19,6 +19,8 @@ describe("useCapitals", () => {
         useCapitals.setState({
             items: [],
             selected: undefined,
+            selection: [],
+            anchor: undefined,
             draft: undefined,
             editing: undefined,
             error: undefined,
@@ -183,5 +185,82 @@ describe("useCapitals", () => {
         await vi.waitFor(() => expect(useCapitals.getState().selected).toEqual(paris));
         expect(useCapitals.getState().draft).toBeUndefined();
         expect(useCapitals.getState().editing).toBe("1");
+    });
+
+    // ---- several selected ----
+
+    describe("selection", () => {
+        const city = (id: string) => ({ id, name: id, country: "X", latitude: 0, longitude: 0, capital: false });
+        const ORDER = ["a", "b", "c", "d"];
+
+        beforeEach(() => {
+            useCapitals.setState({ items: ORDER.map(city) });
+            vi.mocked(api.get).mockImplementation(async (_, id) => city(id));
+        });
+
+        it("selects one, toggles others, and a range from the last click without Shift", async () => {
+            const { select } = useCapitals.getState();
+
+            await select("b");
+            await select("d", "toggle");
+            expect(useCapitals.getState().selection).toEqual(["b", "d"]);
+            expect(useCapitals.getState().selected?.id).toBe("d");
+
+            await select("b", "toggle");
+            expect(useCapitals.getState().selection).toEqual(["d"]);
+
+            // from b (toggled last)
+            await select("a", "range");
+            expect(useCapitals.getState().selection).toEqual(["a", "b"]);
+
+            await select("c");
+            await select("a", "range", ["c", "a"]);
+            expect(useCapitals.getState().selection).toEqual(["c", "a"]);
+        });
+
+        it("drops the focus of a city toggled off, and keeps the selection on blur", async () => {
+            const { select } = useCapitals.getState();
+
+            await select("a");
+            await select("b", "toggle");
+            await select("b", "toggle");
+            expect(useCapitals.getState().selected).toBeUndefined();
+
+            await select("c", "toggle");
+            useCapitals.getState().blur();
+            expect(useCapitals.getState().selected).toBeUndefined();
+            expect(useCapitals.getState().selection).toEqual(["a", "c"]);
+
+            await select();
+            expect(useCapitals.getState().selection).toEqual([]);
+        });
+
+        it("selects all given, without focus", () => {
+            useCapitals.getState().selectAll(["a", "c"]);
+            expect(useCapitals.getState().selection).toEqual(["a", "c"]);
+            expect(useCapitals.getState().selected).toBeUndefined();
+        });
+
+        it("deletes several; those deleted are gone even if one fails", async () => {
+            useCapitals.setState({ selection: ["a", "b", "c"] });
+            vi.mocked(api.remove).mockImplementation(async (_, id) => {
+                if (id === "b") {
+                    throw new Error("409");
+                }
+            });
+
+            await expect(useCapitals.getState().removeMany(["a", "b", "c"])).rejects.toThrow("409");
+            expect(useCapitals.getState().items.map(({ id }) => id)).toEqual(["b", "d"]);
+            expect(useCapitals.getState().selection).toEqual(["b"]);
+        });
+
+        it.each([
+            [{ ctrlKey: true, metaKey: false, shiftKey: false }, "toggle"],
+            [{ ctrlKey: false, metaKey: true, shiftKey: true }, "toggle"],
+            [{ ctrlKey: false, metaKey: false, shiftKey: true }, "range"],
+            [{ ctrlKey: false, metaKey: false, shiftKey: false }, "only"],
+        ])("modifiers %o → %s", (event, how) => {
+            expect(selectingOf(event)).toBe(how);
+        });
     });
 });

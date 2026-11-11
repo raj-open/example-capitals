@@ -25,7 +25,7 @@ import { createPortal } from "react-dom";
 
 import type { Capital } from "../../@api/types.gen.ts";
 import { places } from "../data/places.ts";
-import { DEFAULT_COLOUR, useCapitals } from "../store/capital.ts";
+import { DEFAULT_COLOUR, selectingOf, useCapitals } from "../store/capital.ts";
 import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
 import type { View } from "../store/view.ts";
@@ -66,6 +66,7 @@ const NOT_CITIES = new Set(["country", "disputed_country", "state", "disputed_st
 export function MapView() {
     const items = useCapitals((state) => state.items);
     const selected = useCapitals((state) => state.selected);
+    const selection = useCapitals((state) => state.selection);
     const select = useCapitals((state) => state.select);
     const body = useMapStyle((state) => state.body);
     const style = useMapStyle((state) => state.style);
@@ -104,7 +105,8 @@ export function MapView() {
         });
 
         popup.current.setDOMContent(content.current);
-        popup.current.on("close", () => select());
+        // closing the popup drops the focus only (the selection stays)
+        popup.current.on("close", () => useCapitals.getState().blur());
 
         const target = map.current;
 
@@ -336,10 +338,16 @@ export function MapView() {
             if (!marker) {
                 const node = document.createElement("div");
                 node.className = "marker";
-                // as next to it: select and edit
+                // as next to it: select and edit; with Ctrl/Cmd or Shift: add to the selection (see the list)
                 node.addEventListener("click", (event) => {
                     event.stopPropagation();
-                    propose(item);
+                    const how = selectingOf(event);
+
+                    if (how === "only") {
+                        propose(item);
+                    } else {
+                        select(item.id, how);
+                    }
                 });
 
                 marker = new mapboxgl.Marker({ element: node })
@@ -349,9 +357,9 @@ export function MapView() {
             }
 
             marker.setLngLat([item.longitude, item.latitude]);
-            paint(marker.getElement(), item, item.id === selected?.id);
+            paint(marker.getElement(), item, selection.includes(item.id));
         }
-    }, [items, selected, propose]);
+    }, [items, selection, propose, select]);
 
     // ---- draft (a city proposed to add) ----
 

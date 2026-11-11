@@ -98,6 +98,41 @@ test("adds, edits and deletes a capital", async ({ page }) => {
     await expect(page.locator(`.marker[title="${RENAMED}, ${COUNTRY}"]`)).toHaveCount(0);
 });
 
+test("selects several (Ctrl/Cmd + click, or all matches) and deletes them at once", async ({ page, request }) => {
+    // two capitals (of different countries, as a country has at most one)
+    for (const [name, country, longitude] of [
+        [NAME, COUNTRY, 0],
+        [RENAMED, `${COUNTRY} 2`, 5],
+    ] as const) {
+        const response = await request.post("/api/capital", { data: { name, country, latitude: -20, longitude } });
+        expect(response.status()).toBe(201);
+    }
+
+    await page.goto("/");
+    const entry = (name: string) => page.locator(".sidebar .entry", { hasText: name });
+    const bar = page.getByRole("toolbar", { name: "Selected cities" });
+
+    // click, then Ctrl/Cmd + click: both selected (list and map)
+    await entry(NAME).click();
+    await entry(RENAMED).click({ modifiers: ["ControlOrMeta"] });
+    await expect(bar).toContainText("2 selected");
+    await expect(page.locator(".marker.selected")).toHaveCount(2);
+
+    // clear, then all matches of a search
+    await bar.getByRole("button", { name: "Clear" }).click();
+    await expect(bar).toHaveCount(0);
+    await page.getByRole("searchbox", { name: "Search by country" }).fill(COUNTRY);
+    await page.getByRole("button", { name: "Select all" }).click();
+    await expect(bar).toContainText("2 selected");
+
+    // delete both at once
+    page.once("dialog", (dialog) => dialog.accept());
+    await bar.getByRole("button", { name: "Delete selected" }).click();
+    await expect(entry(NAME)).toHaveCount(0);
+    await expect(entry(RENAMED)).toHaveCount(0);
+    await expect(page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`)).toHaveCount(0);
+});
+
 test.describe("on a phone", () => {
     test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 

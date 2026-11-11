@@ -3,7 +3,9 @@
  *
  * - search by country and by city (separately, both narrow down): only matches are shown;
  *   ↑/↓ cycle through matches, Enter selects, Esc clears
- * - selecting an entry selects the city (GET /capital/{id}), which moves the map there
+ * - selecting an entry selects the city (GET /capital/{id}), which moves the map there;
+ *   Ctrl/Cmd + click adds or removes one, Shift + click a range (of the entries shown); "Select all" takes all matches;
+ *   with several selected, a bar offers one colour for all and delete (see SelectionBar)
  * - per entry: colour dot (= marker colour), edit and delete; add via + in the header,
  *   or via the map: a click on a city, or right-click / long-press anywhere (the form opens prefilled, see /frontend/src/components/MapView.tsx)
  * - grouped by country (name only on the first entry of a group), the capital first
@@ -16,13 +18,14 @@
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { NEW, useCapitals } from "../store/capital.ts";
+import { NEW, selectingOf, useCapitals } from "../store/capital.ts";
 import { useSettings } from "../store/settings.ts";
 import { LOCALE } from "../utils/locale.ts";
 import { type Query, search } from "../utils/search.ts";
 import { CapitalForm } from "./CapitalForm.tsx";
 import { CapitalItem } from "./CapitalItem.tsx";
 import { Chevron, Plus } from "./icons.tsx";
+import { SelectionBar } from "./SelectionBar.tsx";
 
 // ----------------------------------------------------------------
 // LOCAL CONSTANTS
@@ -35,7 +38,8 @@ const EMPTY: Query = { country: "", name: "" };
 // ----------------------------------------------------------------
 
 export function CapitalList() {
-    const { items, selected, draft, editing, error, select, add, edit, remove, setEditing } = useCapitals();
+    const { items, selected, selection, draft, editing, error, select, selectAll, add, edit, remove, setEditing } =
+        useCapitals();
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const setSettings = useSettings((state) => state.set);
     const title = capitalsOnly ? "Capitals" : "Cities";
@@ -174,6 +178,11 @@ export function CapitalList() {
                             ? `${matches.length === 0 ? 0 : (index % matches.length) + 1} / ${count(matches.length, "match", "matches")}`
                             : count(items.length, noun, capitalsOnly ? "capitals" : "cities")}
                     </small>
+                    {searching && matches.length > 1 && (
+                        <button type="button" className="link" onClick={() => selectAll(shown.map(({ id }) => id))}>
+                            Select all
+                        </button>
+                    )}
                     <label className="sidebar-switch">
                         <input
                             type="checkbox"
@@ -185,6 +194,7 @@ export function CapitalList() {
                         Capitals only
                     </label>
                 </div>
+                <SelectionBar />
                 {(problem ?? error) && <p className="error">{problem ?? error}</p>}
                 {editing === NEW && (
                     <CapitalForm
@@ -229,11 +239,17 @@ export function CapitalList() {
                             first={i === 0 || shown[i - 1].country !== item.country}
                             current={item.id === selected?.id}
                             className={classes({
-                                selected: item.id === selected?.id,
+                                selected: selection.includes(item.id),
                                 active: searching && item.id === active,
                             })}
                             ref={keep(item.id)}
-                            onSelect={() => select(item.id)}
+                            onSelect={(event) =>
+                                select(
+                                    item.id,
+                                    selectingOf(event),
+                                    shown.map(({ id }) => id),
+                                )
+                            }
                             onEdit={() => setEditing(item.id)}
                             onDelete={() => onDelete(item.id, `${item.name}, ${item.country}`)}
                         />
