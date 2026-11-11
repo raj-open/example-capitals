@@ -9,6 +9,7 @@
  * marks the spot with a pin and opens the form in the sidebar, prefilled; a stored city is selected instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
+ * The view on Earth is remembered (see /frontend/src/store/view.ts): a reload, or a return from another world, keeps it.
  */
 
 // ----------------------------------------------------------------
@@ -25,6 +26,8 @@ import { places } from "../data/places.ts";
 import { DEFAULT_COLOUR, useCapitals } from "../store/capital.ts";
 import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
+import type { View } from "../store/view.ts";
+import { useView } from "../store/view.ts";
 import { markerSize } from "../utils/markers.ts";
 import type { Spot } from "../utils/snap.ts";
 import { snap } from "../utils/snap.ts";
@@ -82,11 +85,11 @@ export function MapView() {
         }
 
         mapboxgl.accessToken = token;
+        const { body } = useMapStyle.getState();
         map.current = new mapboxgl.Map({
             container: element.current,
             style: styleOf(useMapStyle.getState()),
-            center: [10, 30],
-            zoom: 1.5,
+            ...(body === "earth" ? viewOf(useView.getState()) : {}),
         });
 
         popup.current.setDOMContent(content.current);
@@ -101,6 +104,14 @@ export function MapView() {
 
         // marker size via a CSS variable, so markers need no update of their own
         const target = map.current;
+
+        // remember the view on Earth (not during a flyby or on another world)
+        target.on("moveend", () => {
+            if (ready.current && !travelling.current) {
+                useView.getState().set(viewOf(target));
+            }
+        });
+
         const resize = () =>
             target.getContainer().style.setProperty("--marker-size", `${markerSize(target.getZoom())}px`);
         target.on("zoom", resize);
@@ -169,10 +180,15 @@ export function MapView() {
         const container = target.getContainer();
         container.classList.add("offworld");
 
-        // back on Earth with a selected city: arrive there and open its popup
+        // back on Earth: arrive at the selected city (and open its popup), otherwise at the remembered view
         const arrival = () => {
             const { selected } = useCapitals.getState();
-            return !other && selected ? { center: lngLat(selected), zoom: ZOOM } : undefined;
+
+            if (other) {
+                return undefined;
+            }
+
+            return selected ? { center: lngLat(selected), zoom: ZOOM } : viewOf(useView.getState());
         };
 
         flyby(target, load, arrival, () => trip === trips.current).then((arrived) => {
@@ -303,7 +319,7 @@ export function MapView() {
 function flyby(
     map: mapboxgl.Map,
     load: () => void,
-    arrival: () => { center: [number, number]; zoom: number } | undefined,
+    arrival: () => (Pick<View, "center" | "zoom"> & Partial<View>) | undefined,
     current: () => boolean,
 ): Promise<boolean> {
     const container = map.getContainer();
@@ -325,10 +341,11 @@ function flyby(
                     return;
                 }
 
-                const { center, zoom } = arrival() ?? { center: [lng, 0] as [number, number], zoom: 1.5 };
+                const destination = arrival() ?? { center: [lng, 0] as [number, number], zoom: 1.5 };
+                const { center } = destination;
                 map.jumpTo({ center: [center[0] - 150, 25], zoom: 0, bearing: -35 });
                 container.classList.remove("travelling");
-                map.flyTo({ center, zoom, bearing: 0, duration: ARRIVAL, curve: 1.2, essential: false });
+                map.flyTo({ bearing: 0, ...destination, duration: ARRIVAL, curve: 1.2, essential: false });
                 map.once("moveend", () => resolve(current()));
             });
 
@@ -393,6 +410,19 @@ function proposeAt(map: mapboxgl.Map, spot: Spot) {
     const project = ({ longitude, latitude }: Spot) => map.project([longitude, latitude]);
 
     propose(snap(spot, places(items), project));
+}
+
+/**
+ * The view of a map, or the view to restore (from the store).
+ */
+function viewOf(source: mapboxgl.Map | View): View {
+    if (source instanceof mapboxgl.Map) {
+        const { lng, lat } = source.getCenter();
+        return { center: [lng, lat], zoom: source.getZoom(), bearing: source.getBearing(), pitch: source.getPitch() };
+    }
+
+    const { center, zoom, bearing, pitch } = source;
+    return { center, zoom, bearing, pitch };
 }
 
 function lngLat({ longitude, latitude }: Spot): [number, number] {
