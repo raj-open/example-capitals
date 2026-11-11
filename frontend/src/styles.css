@@ -208,8 +208,8 @@ input {
     gap: 0.5rem;
 }
 
-/* "Select all" (while searching): a button that looks like a link */
-.sidebar .sidebar-meta .link {
+/* "Select all" (while searching), "Show all" (limited to countries): buttons that look like links */
+.sidebar .link {
     padding: 0;
     border: 0;
     background: none;
@@ -807,7 +807,15 @@ input {
 }
 
 /* ---------------------------------------------------------------- */
-/* bulk actions for several selected cities */
+/* limited to some countries: which, and "Show all" */
+.sidebar .sidebar-filter {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+/* actions for the selected cities */
 .sidebar .selection-bar {
     display: flex;
     flex-wrap: wrap;

@@ -11,6 +11,7 @@
  * a stored city (its marker, or next to it: hint "Edit …") is selected and opened in the sidebar to edit instead.
  * The appearance (basemap, light preset, theme) follows the map store (/frontend/src/store/map.ts),
  * chosen via the settings button on the map.
+ * Limited to some countries (see the list), only their markers are shown and the map fits them.
  * The view on Earth is remembered (see /frontend/src/store/view.ts): a reload, or a return from another world, keeps it.
  */
 
@@ -20,12 +21,12 @@
 
 import "mapbox-gl/dist/mapbox-gl.css";
 import mapboxgl from "mapbox-gl";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import type { Capital } from "../../@api/types.gen.ts";
 import { places } from "../data/places.ts";
-import { DEFAULT_COLOUR, selectingOf, useCapitals } from "../store/capital.ts";
+import { DEFAULT_COLOUR, selectingOf, useCapitals, visible } from "../store/capital.ts";
 import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
 import type { View } from "../store/view.ts";
@@ -67,6 +68,8 @@ export function MapView() {
     const items = useCapitals((state) => state.items);
     const selected = useCapitals((state) => state.selected);
     const selection = useCapitals((state) => state.selection);
+    const countries = useCapitals((state) => state.countries);
+    const shown = useMemo(() => visible(items, countries), [items, countries]);
     const select = useCapitals((state) => state.select);
     const body = useMapStyle((state) => state.body);
     const style = useMapStyle((state) => state.style);
@@ -323,7 +326,7 @@ export function MapView() {
             return;
         }
 
-        const ids = new Set(items.map(({ id }) => id));
+        const ids = new Set(shown.map(({ id }) => id));
 
         for (const [id, marker] of markers.current) {
             if (!ids.has(id)) {
@@ -332,7 +335,7 @@ export function MapView() {
             }
         }
 
-        for (const item of items) {
+        for (const item of shown) {
             let marker = markers.current.get(item.id);
 
             if (!marker) {
@@ -359,7 +362,26 @@ export function MapView() {
             marker.setLngLat([item.longitude, item.latitude]);
             paint(marker.getElement(), item, selection.includes(item.id));
         }
-    }, [items, selection, propose, select]);
+    }, [shown, selection, propose, select]);
+
+    // limited to some countries: fit the map to their cities
+    useEffect(() => {
+        const target = map.current;
+        const { items } = useCapitals.getState();
+        const cities = visible(items, countries);
+
+        if (!target || !ready.current || countries.length === 0 || cities.length === 0) {
+            return;
+        }
+
+        const bounds = new mapboxgl.LngLatBounds();
+
+        for (const city of cities) {
+            bounds.extend(lngLat(city));
+        }
+
+        target.fitBounds(bounds, { padding: 80, maxZoom: ZOOM });
+    }, [countries]);
 
     // ---- draft (a city proposed to add) ----
 

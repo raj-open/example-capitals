@@ -45,6 +45,8 @@ export interface CapitalState {
     selection: string[];
     /** where a range (Shift) starts */
     anchor?: string;
+    /** countries the list and the map are limited to (none: all) */
+    countries: string[];
     /** a city to add, proposed on the map (for the form, prefilled) */
     draft?: Spot;
     /** the open form in the sidebar: NEW (to add, with the draft if any) or the id of a city (to edit) */
@@ -59,7 +61,8 @@ export interface CapitalState {
     edit: (id: string, input: CapitalInput) => Promise<Capital>;
     remove: (id: string) => Promise<void>;
     removeMany: (ids: string[]) => Promise<void>;
-    setColour: (id: string, colour: string) => void;
+    setColour: (id: string, colour?: string) => void;
+    showCountries: (countries: string[]) => void;
     propose: (draft?: Spot) => void;
     setEditing: (editing?: string) => void;
 }
@@ -74,6 +77,7 @@ export interface CapitalState {
 export const useCapitals = create<CapitalState>()((set, get) => ({
     items: [],
     selection: [],
+    countries: [],
 
     /**
      * Loads all cities of the current resource; selected cities which are no longer listed are deselected.
@@ -197,6 +201,7 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
 
     /**
      * Shows a colour at once and saves it (PUT) after a short delay; a failed save is reported as error.
+     * No colour removes it (the default colour is shown).
      */
     setColour: (id, colour) => {
         const paint = (item: Capital) => (item.id === id ? { ...item, colour } : item);
@@ -234,7 +239,14 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
      */
     propose: (draft) => {
         if (draft?.id !== undefined) {
-            set({ draft: undefined, editing: draft.id });
+            const { id } = draft;
+
+            // a city outside the countries shown (still snapped to on the map): show all
+            set((state) => ({
+                draft: undefined,
+                editing: id,
+                countries: visible(state.items, state.countries).some((item) => item.id === id) ? state.countries : [],
+            }));
             get().select(draft.id);
             return;
         }
@@ -248,11 +260,38 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
     setEditing: (editing) => {
         set({ editing, draft: undefined });
     },
+
+    /**
+     * Limits the list and the map to some countries (none: all); selected cities outside are deselected.
+     */
+    showCountries: (countries) => {
+        set((state) => {
+            const shown = new Set(visible(state.items, countries).map(({ id }) => id));
+
+            return {
+                countries: [...new Set(countries)],
+                selection: state.selection.filter((id) => shown.has(id)),
+                selected: state.selected && shown.has(state.selected.id) ? state.selected : undefined,
+            };
+        });
+    },
 }));
 
 // ----------------------------------------------------------------
 // METHODS
 // ----------------------------------------------------------------
+
+/**
+ * The cities of some countries (none: all).
+ */
+export function visible(items: Capital[], countries: string[]): Capital[] {
+    if (countries.length === 0) {
+        return items;
+    }
+
+    const shown = new Set(countries);
+    return items.filter(({ country }) => shown.has(country));
+}
 
 /**
  * How a click selects, by its modifier keys: Ctrl/Cmd toggles, Shift selects a range.

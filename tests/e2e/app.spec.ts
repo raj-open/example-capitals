@@ -98,7 +98,10 @@ test("adds, edits and deletes a capital", async ({ page }) => {
     await expect(page.locator(`.marker[title="${RENAMED}, ${COUNTRY}"]`)).toHaveCount(0);
 });
 
-test("selects several (Ctrl/Cmd + click, or all matches) and deletes them at once", async ({ page, request }) => {
+test("selects several (Ctrl/Cmd + click, or all matches): their countries only, one colour, delete", async ({
+    page,
+    request,
+}) => {
     // two capitals (of different countries, as a country has at most one)
     for (const [name, country, longitude] of [
         [NAME, COUNTRY, 0],
@@ -124,6 +127,23 @@ test("selects several (Ctrl/Cmd + click, or all matches) and deletes them at onc
     await page.getByRole("searchbox", { name: "Search by country" }).fill(COUNTRY);
     await page.getByRole("button", { name: "Select all" }).click();
     await expect(bar).toContainText("2 selected");
+
+    // only their countries (list and map), then all again
+    await page.getByRole("searchbox", { name: "Search by country" }).fill("");
+    await bar.getByRole("button", { name: "Only these countries" }).click();
+    await expect(page.locator(".sidebar .entry")).toHaveCount(2);
+    await expect(page.locator(".marker")).toHaveCount(2);
+    await page.getByRole("button", { name: "Show all" }).click();
+    await expect(page.locator(".sidebar-filter")).toHaveCount(0);
+
+    // one colour for all, undone
+    await bar.locator('input[type="color"]').fill("#00aa55");
+    await expect(page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`)).toHaveCSS("background-color", "rgb(0, 170, 85)");
+    await bar.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator(`.marker[title="${NAME}, ${COUNTRY}"]`)).not.toHaveCSS(
+        "background-color",
+        "rgb(0, 170, 85)",
+    );
 
     // delete both at once
     page.once("dialog", (dialog) => dialog.accept());

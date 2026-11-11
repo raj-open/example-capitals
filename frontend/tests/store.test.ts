@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as api from "../src/api/capital.ts";
-import { NEW, selectingOf, useCapitals } from "../src/store/capital.ts";
+import { NEW, selectingOf, useCapitals, visible } from "../src/store/capital.ts";
 import { useSettings } from "../src/store/settings.ts";
 
 // ----------------------------------------------------------------
@@ -21,6 +21,7 @@ describe("useCapitals", () => {
             selected: undefined,
             selection: [],
             anchor: undefined,
+            countries: [],
             draft: undefined,
             editing: undefined,
             error: undefined,
@@ -252,6 +253,30 @@ describe("useCapitals", () => {
             await expect(useCapitals.getState().removeMany(["a", "b", "c"])).rejects.toThrow("409");
             expect(useCapitals.getState().items.map(({ id }) => id)).toEqual(["b", "d"]);
             expect(useCapitals.getState().selection).toEqual(["b"]);
+        });
+
+        it("limits to countries (deselecting cities outside), and shows all again", () => {
+            useCapitals.setState({
+                items: [city("a"), { ...city("b"), country: "Y" }, { ...city("c"), country: "Z" }],
+                selection: ["a", "b", "c"],
+            });
+
+            useCapitals.getState().showCountries(["X", "Y", "X"]);
+            expect(useCapitals.getState().countries).toEqual(["X", "Y"]);
+            expect(useCapitals.getState().selection).toEqual(["a", "b"]);
+            expect(visible(useCapitals.getState().items, ["Y"]).map(({ id }) => id)).toEqual(["b"]);
+
+            useCapitals.getState().showCountries([]);
+            expect(visible(useCapitals.getState().items, []).length).toBe(3);
+        });
+
+        it("removes a colour (back to the default)", () => {
+            vi.useFakeTimers();
+            useCapitals.setState({ items: [{ ...city("a"), colour: "#00ff00" }] });
+
+            useCapitals.getState().setColour("a", undefined);
+            expect(useCapitals.getState().items[0].colour).toBeUndefined();
+            vi.useRealTimers();
         });
 
         it.each([

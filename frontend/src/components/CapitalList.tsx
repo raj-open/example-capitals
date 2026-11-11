@@ -6,6 +6,7 @@
  * - selecting an entry selects the city (GET /capital/{id}), which moves the map there;
  *   Ctrl/Cmd + click adds or removes one, Shift + click a range (of the entries shown); "Select all" takes all matches;
  *   with several selected, a bar offers one colour for all and delete (see SelectionBar)
+ * - the list (and the map) can be limited to the countries of the selection (via the bar); "Show all" or Esc ends it
  * - per entry: colour dot (= marker colour), edit and delete; add via + in the header,
  *   or via the map: a click on a city, or right-click / long-press anywhere (the form opens prefilled, see /frontend/src/components/MapView.tsx)
  * - grouped by country (name only on the first entry of a group), the capital first
@@ -18,7 +19,7 @@
 
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { NEW, selectingOf, useCapitals } from "../store/capital.ts";
+import { NEW, selectingOf, useCapitals, visible } from "../store/capital.ts";
 import { useSettings } from "../store/settings.ts";
 import { LOCALE } from "../utils/locale.ts";
 import { type Query, search } from "../utils/search.ts";
@@ -38,8 +39,23 @@ const EMPTY: Query = { country: "", name: "" };
 // ----------------------------------------------------------------
 
 export function CapitalList() {
-    const { items, selected, selection, draft, editing, error, select, selectAll, add, edit, remove, setEditing } =
-        useCapitals();
+    const {
+        items: all,
+        countries,
+        selected,
+        selection,
+        draft,
+        editing,
+        error,
+        select,
+        selectAll,
+        add,
+        edit,
+        remove,
+        setEditing,
+        showCountries,
+    } = useCapitals();
+    const items = useMemo(() => visible(all, countries), [all, countries]);
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
     const setSettings = useSettings((state) => state.set);
     const title = capitalsOnly ? "Capitals" : "Cities";
@@ -101,7 +117,12 @@ export function CapitalList() {
         } else if (event.key === "Enter" && active !== undefined) {
             select(active);
         } else if (event.key === "Escape") {
-            setQuery(EMPTY);
+            // first the search, then the limit to countries
+            if (searching) {
+                setQuery(EMPTY);
+            } else {
+                showCountries([]);
+            }
         }
     }
 
@@ -194,6 +215,14 @@ export function CapitalList() {
                         Capitals only
                     </label>
                 </div>
+                {countries.length > 0 && (
+                    <div className="sidebar-filter">
+                        <small>Only: {countries.join(", ")}</small>
+                        <button type="button" className="link" onClick={() => showCountries([])}>
+                            Show all
+                        </button>
+                    </div>
+                )}
                 <SelectionBar />
                 {(problem ?? error) && <p className="error">{problem ?? error}</p>}
                 {editing === NEW && (
