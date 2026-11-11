@@ -1,6 +1,7 @@
 /**
  * Inline form to add or edit a capital (in the sidebar).
- * To add, it may come prefilled (a city proposed on the map), with any fields.
+ * To add, it may come prefilled (a city proposed on the map), with any fields;
+ * if it says whether the city is a capital, the choice is offered even with "Capitals only".
  *
  * The colour of the marker can be set here, too (as in the popup); unchanged, the city keeps its colour (or the default).
  *
@@ -79,8 +80,7 @@ export function CapitalForm({
                 name: fields.name.trim(),
                 latitude,
                 longitude,
-                // in capitals mode (/capital), every city is a capital
-                capital: capitalsOnly || capital,
+                capital,
                 ...(colour && { colour }),
             });
         } catch (err) {
@@ -118,7 +118,7 @@ export function CapitalForm({
                 />
             </div>
             <div className="capital-form-options">
-                {!capitalsOnly && (
+                {(!capitalsOnly || initial?.capital === false) && (
                     <label className="capital-form-check">
                         <input
                             type="checkbox"

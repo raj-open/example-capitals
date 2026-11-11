@@ -90,9 +90,17 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
         }
     },
 
+    /**
+     * Adds a city; one which is not a capital goes to /city even with "Capitals only" (and is then not listed).
+     */
     add: async (input) => {
-        const item = await api.create(resource(), input);
-        set((state) => ({ items: sort([...state.items, item]) }));
+        const target = input.capital ? resource() : "city";
+        const item = await api.create(target, input);
+
+        if (target === resource()) {
+            set((state) => ({ items: sort([...state.items, item]) }));
+        }
+
         return item;
     },
 

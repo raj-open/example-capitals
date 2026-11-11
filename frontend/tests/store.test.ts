@@ -138,6 +138,16 @@ describe("useCapitals", () => {
         vi.useRealTimers();
     });
 
+    it("adds an ordinary city via /city even with capitals only, without listing it", async () => {
+        const lyon = { id: "2", name: "Lyon", country: "France", latitude: 45.76, longitude: 4.84, capital: false };
+        vi.mocked(api.create).mockClear().mockResolvedValue(lyon);
+
+        const { id: _, ...input } = lyon;
+        expect(await useCapitals.getState().add(input)).toEqual(lyon);
+        expect(api.create).toHaveBeenCalledWith("city", input);
+        expect(useCapitals.getState().items).toEqual([]);
+    });
+
     it("proposes a new city and withdraws it", () => {
         const draft = { name: "Lyon", country: "France", latitude: 45.76, longitude: 4.84 };
 

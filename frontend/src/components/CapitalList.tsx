@@ -195,12 +195,19 @@ export function CapitalList() {
                     <CapitalForm
                         // a new draft (another spot on the map) refills the form
                         key={draft ? `${draft.latitude},${draft.longitude}` : NEW}
-                        initial={draft}
+                        // a city from the map is not a capital, unless chosen (a stored capital is selected instead)
+                        initial={draft && { capital: false, ...draft }}
                         action="Add"
                         onCancel={close}
                         onSubmit={async (input) => {
                             const item = await add(input);
                             close();
+
+                            // an ordinary city added with "Capitals only": show all cities, so it is listed
+                            if (capitalsOnly && !item.capital) {
+                                setSettings({ capitalsOnly: false });
+                            }
+
                             await select(item.id);
                         }}
                     />
