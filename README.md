@@ -52,6 +52,16 @@ just dev        # UI on http://localhost:5173, API on http://localhost:${PORT} (
 
 `PORT` and `DATABASE_PORT` are the values from `.env` (3001 and 27017 in [the template](templates/template.env)).
 
+Data, while `just dev` runs (as in the settings panel of the map):
+
+```bash
+just data-clear      # removes all cities
+just data-examples   # adds the example cities
+just data-capitals   # imports all capitals from REST Countries (costs requests of the monthly quota)
+just data-cities     # adds a large sample of ordinary cities
+just clear-db        # recreates the database itself (needed when db/schema.js changes)
+```
+
 When done:
 
 ```bash
