@@ -39,6 +39,7 @@ setup:
     mkdir -p .devcontainer
     cp templates/template-devcontainer.json .devcontainer/devcontainer.json
     cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml
+    cp templates/template-devcontainer.Dockerfile .devcontainer/Dockerfile
     @just _deps
     @just models
 
