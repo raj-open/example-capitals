@@ -15,7 +15,8 @@ services:
   # SERVICE: WORKSPACE
   # --------------------------------
   app:
-    image: mcr.microsoft.com/devcontainers/typescript-node:1-24-bookworm
+    # NOTE: a Dockerfile, not dockerfile_inline, as the devcontainer CLI reads it to extend the image
+    build: .
 
     env_file:
       # NOTE: compose runs from /.devcontainer, so the repo-root .env is only read via env_file (no interpolation).
@@ -26,6 +27,12 @@ services:
     environment:
       DATABASE_HOST: db
       DATABASE_USER: ""
+
+    # published for the devcontainer CLI, which ignores forwardPorts (VS Code and Codespaces forward them);
+    # bound to 127.0.0.1, so they are not reachable from the network
+    ports:
+      - "127.0.0.1:5173:5173"
+      - "127.0.0.1:3001:3001"
 
     volumes:
       - "..:/workspace:cached"

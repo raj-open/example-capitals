@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "setup": "just setup",
-    "setup:devcontainer": "mkdir -p .devcontainer && cp templates/template-devcontainer.json .devcontainer/devcontainer.json && cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml",
+    "setup:devcontainer": "mkdir -p .devcontainer && cp templates/template-devcontainer.json .devcontainer/devcontainer.json && cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml && cp templates/template-devcontainer.Dockerfile .devcontainer/Dockerfile",
     "models": "just models",
     "serve:db": "just serve-db",
     "stop:db": "just stop-db",
