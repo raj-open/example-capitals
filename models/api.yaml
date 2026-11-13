@@ -25,6 +25,12 @@ paths:
   # /capital: capitals only; a city with `capital: false` is rejected with 400 (use /city)
   # /city: all cities; same shape and operations
   /capital:
+    parameters:
+      - name: country
+        in: query
+        required: false
+        schema:
+          type: string
     get:
       summary: all capital cities, by country
       responses:
