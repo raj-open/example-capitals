@@ -13,6 +13,7 @@ import { handleErrors } from "./_core/errors.ts";
 import { createRouter } from "./routes/capital.ts";
 import { router as data } from "./routes/data.ts";
 import { router as health } from "./routes/health.ts";
+import { router as places } from "./routes/places.ts";
 
 // ----------------------------------------------------------------
 // METHODS
@@ -28,6 +29,7 @@ export function createApp(): Express {
     app.use("/capital", createRouter({ capitalsOnly: true }));
     app.use("/city", createRouter({ capitalsOnly: false }));
     app.use("/data", data);
+    app.use("/places", places);
 
     app.use(handleErrors);
     return app;
