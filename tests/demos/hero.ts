@@ -111,7 +111,7 @@ export function encode(dir: string = PATH_FRAMES, out: string = PATH_HERO) {
 // MAIN
 // ----------------------------------------------------------------
 
-// run directly: node tests/demos/hero.ts [folder of frames] (NOTE: not via import.meta.main, which Node 22 lacks)
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// run directly: node tests/demos/hero.ts [folder of frames]
+if (import.meta.main) {
     encode(process.argv[2] || PATH_FRAMES);
 }
