@@ -12,6 +12,7 @@
 !/justfile
 !/package.json
 !/package-lock.json
+!/.npmrc
 !/tsconfig.base.json
 !/biome.json
 

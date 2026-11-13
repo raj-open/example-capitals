@@ -49,24 +49,27 @@ models: _deps
     npx --no -- openapi-ts -i ./models/api.yaml -o ./backend/@api -p @hey-api/typescript --no-log-file
     npx --no -- openapi-ts -i ./models/api.yaml -o ./frontend/@api -p @hey-api/typescript --no-log-file
 
-# upgrade dependencies within manifest ranges (rewrites the lock file)
-[group('setup')]
-upgrade:
-    npm update
-
-# follow the lock file; rewrite it only if a manifest changed;
-# reinstall if an install did not finish (npm writes node_modules/.package-lock.json last) or the lock file changed
+# install exactly as the lock file says (`npm ci`); never rewrite an existing lock file.
+# a lock file is created (from scratch) only if missing: to upgrade, delete /package-lock.json, then run `just build`.
+# reinstall if an install did not finish (npm writes node_modules/.package-lock.json last)
+# or a manifest/the lock file changed since (`npm ci` fails if they disagree);
+# npm and node versions are pinned via `devEngines` in /package.json
 _deps:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ ! -f package-lock.json ] \
-        || [ package.json -nt package-lock.json ] \
-        || [ backend/package.json -nt package-lock.json ] \
-        || [ frontend/package.json -nt package-lock.json ]; then
+    marker="node_modules/.package-lock.json"
+    manifests="package-lock.json package.json backend/package.json frontend/package.json"
+    if [ ! -f package-lock.json ]; then
+        # resolve from scratch: from an existing node_modules, npm writes no `resolved`/`integrity`
+        rm -rf node_modules backend/node_modules frontend/node_modules
         npm install
-    elif [ ! -f node_modules/.package-lock.json ] \
-        || [ package-lock.json -nt node_modules/.package-lock.json ]; then
+
+    elif [ ! -f "${marker}" ]; then
         npm ci
+
+    elif [ -n "$(find ${manifests} -newer "${marker}")" ]; then
+        npm ci
+
     fi
 
 # ----------------------------------------------------------------

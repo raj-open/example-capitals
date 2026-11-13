@@ -39,10 +39,19 @@ jobs:
         with:
           persist-credentials: false
 
+      # NOTE: no npm cache here: it runs npm inside the repo before npm is upgraded (`devEngines` refuses the bundled npm)
       - uses: actions/setup-node@v7.1.0
         with:
-          node-version: 22
-          cache: npm
+          node-version: 26
+          package-manager-cache: false
+
+      - name: Setup npm
+        # NOTE: outside the repo, as `devEngines` refuses any other npm inside it
+        working-directory: ${{ runner.temp }}
+        run: |-
+          # NOTE: as pinned in /package.json (`devEngines`)
+          npm install --global "npm@$(node -p 'require(process.env.GITHUB_WORKSPACE + "/package.json").devEngines.packageManager.version')"
+          npm --version
 
       - uses: extractions/setup-just@v4
 
