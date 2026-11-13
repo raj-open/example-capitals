@@ -49,6 +49,11 @@ describe("/places", () => {
 
 // NOTE: no database here, so only requests that fail before the DB is reached
 describe("/capital", () => {
+    it("gets", async () => {
+        const response = await fetch(`${base}/capital?country=Land1&country=Land2`);
+        expect(response.status).toBe(400);
+    });
+
     it("rejects an invalid body before touching the DB", async () => {
         const response = await fetch(`${base}/capital`, {
             method: "POST",
