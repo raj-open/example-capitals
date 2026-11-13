@@ -48,7 +48,7 @@
     "clean:all": "just clean-all"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.7",
     "@cucumber/cucumber": "^13.3.0",
     "@hey-api/openapi-ts": "0.99.0",
     "@playwright/test": "1.65.0",
