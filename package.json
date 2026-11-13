@@ -34,6 +34,9 @@
       "onFail": "error"
     }
   },
+  "allowScripts": {
+    "fsevents": false
+  },
   "workspaces": [
     "backend",
     "frontend"
