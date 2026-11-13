@@ -53,7 +53,7 @@ export interface CapitalState {
     editing?: string;
     error?: string;
 
-    load: () => Promise<void>;
+    load: (country?: string) => Promise<void>;
     select: (id?: string, how?: Selecting, order?: string[]) => Promise<void>;
     selectAll: (ids: string[]) => void;
     blur: () => void;
@@ -82,9 +82,9 @@ export const useCapitals = create<CapitalState>()((set, get) => ({
     /**
      * Loads all cities of the current resource; selected cities which are no longer listed are deselected.
      */
-    load: async () => {
+    load: async (country?: string) => {
         try {
-            const items = await api.list(resource());
+            const items = await api.list(resource(), { country });
             const ids = new Set(items.map(({ id }) => id));
 
             set((state) => ({

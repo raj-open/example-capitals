@@ -8,6 +8,7 @@
 
 import { Router } from "express";
 
+import { BadRequestError } from "../_core/errors.ts";
 import { parseCapitalInput } from "../models/capital.ts";
 import type { Scope } from "../services/capital.ts";
 import * as service from "../services/capital.ts";
@@ -19,8 +20,14 @@ import * as service from "../services/capital.ts";
 export function createRouter(scope: Scope): Router {
     const router = Router();
 
-    router.get("/", async (_req, res) => {
-        res.json(await service.list(scope));
+    router.get("/", async (req, res) => {
+        const { country } = req.query;
+        if (country !== undefined && typeof country !== "string") {
+            throw new BadRequestError(
+                `expected single query parameter of type string for country, got ${typeof country} instead`,
+            );
+        }
+        res.json(await service.list(scope, country));
     });
 
     router.get("/:key", async (req, res) => {

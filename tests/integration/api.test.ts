@@ -23,14 +23,43 @@ import type { Capital, CapitalInput } from "../../backend/src/models/capital.ts"
 // LOCAL CONSTANTS
 // ----------------------------------------------------------------
 
-const FIRST: CapitalInput = { name: "Testopolis", country: "Testland", latitude: 10, longitude: 20, capital: true };
+const FIRST: CapitalInput = {
+    name: "Testopolis",
+    country: "Testland",
+    latitude: 10,
+    longitude: 20,
+    capital: true,
+};
 const SECOND: CapitalInput = {
-    name: "Testburg",
     country: "Testonia",
+    name: "Testburg",
     latitude: -10.5,
     longitude: -20.5,
     capital: true,
 };
+const COUNTRIES: CapitalInput[] = [
+    {
+        country: "Goldonia",
+        name: "Goldstein",
+        latitude: 50.78,
+        longitude: 60.14,
+        capital: true,
+    },
+    {
+        country: "Silvania",
+        name: "Silverford",
+        latitude: -85.78,
+        longitude: 160.14,
+        capital: true,
+    },
+    {
+        country: "Copernia",
+        name: "Coppergrad",
+        latitude: -21.08,
+        longitude: -137.14,
+        capital: true,
+    },
+];
 
 // ----------------------------------------------------------------
 // LOCAL VARIABLES
@@ -191,6 +220,63 @@ describe("/capital", () => {
     });
 });
 
+describe("/capital?country", () => {
+    const ids: string[] = [];
+
+    beforeAll(async () => {
+        for (const country of COUNTRIES) {
+            const city = await create(country);
+            ids.push(city.id);
+        }
+    });
+
+    afterAll(async () => {
+        console.log(ids);
+        for (const id of ids) {
+            await deleteCity(id);
+        }
+    });
+
+    it("does not filter by country if no query provided", async () => {
+        const response = await send("GET", "/capital");
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body).toBeInstanceOf(Array);
+        expect(body.length).toBeGreaterThan(1);
+    });
+
+    it("does not filter by country query with empty country provided", async () => {
+        const response = await send("GET", "/capital?country=");
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body).toBeInstanceOf(Array);
+        expect(body.length).toBeGreaterThan(1);
+    });
+
+    it("filters by country if one provided", async () => {
+        const response = await send("GET", `/capital?country=Silvania`);
+        const body = await response.json();
+        expect(body).toBeInstanceOf(Array);
+        expect(body).toHaveLength(1);
+    });
+
+    it("filters by country if unknown provided", async () => {
+        const response = await send("GET", `/capital?country=Coalland`);
+        const body = await response.json();
+        expect(body).toBeInstanceOf(Array);
+        expect(body).toEqual([]);
+    });
+
+    it.each(["country=Silvania&country=Goldonia", "country=Silvania&country=Goldonia&country=Coalland"])(
+        "rejects ?%s with desired 400 error code",
+        async (query) => {
+            const response = await send("GET", `/capital?${query}`);
+            const body = await response.json();
+            expect(body.error).toBeDefined();
+        },
+    );
+});
+
 // ----------------------------------------------------------------
 // AUXILIARY METHODS
 // ----------------------------------------------------------------
@@ -211,6 +297,11 @@ async function create(input: CapitalInput, resource = "capital"): Promise<Capita
     const response = await send("POST", `/${resource}`, input);
     expect(response.status).toBe(201);
     return response.json();
+}
+
+async function deleteCity(id: string, resource = "capital"): Promise<void> {
+    const response = await send("DELETE", `/${resource}/${id}`);
+    expect(response.status).toBe(204);
 }
 
 async function createCity(input: CapitalInput): Promise<Capital> {

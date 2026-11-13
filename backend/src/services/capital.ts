@@ -29,9 +29,12 @@ export interface Scope {
 // METHODS
 // ----------------------------------------------------------------
 
-export async function list(scope: Scope): Promise<Capital[]> {
+export async function list(scope: Scope, country?: string): Promise<Capital[]> {
     return capitals() //
-        .find(filter(scope))
+        .find({
+            ...filter(scope),
+            ...(country ? { country } : {}),
+        })
         .sort({ country: 1, capital: -1, name: 1 }) // capital first within a country
         .map(toCapital)
         .toArray();

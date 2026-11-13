@@ -19,7 +19,14 @@ export type Resource = "capital" | "city";
 // METHODS
 // ----------------------------------------------------------------
 
-export const list = (resource: Resource) => request<Capital[]>("GET", `/${resource}`);
+export const list = (resource: Resource, { country }: { country?: string } = {}) => {
+    let path = `/${resource}`;
+    if (country) {
+        path = `${path}?${new URLSearchParams({ country })}`;
+    }
+    const response = request<Capital[]>("GET", path);
+    return response;
+};
 
 export const get = (resource: Resource, key: string) =>
     request<Capital>("GET", `/${resource}/${encodeURIComponent(key)}`);
