@@ -24,6 +24,7 @@
 !/backend/package.json
 !/backend/tsconfig.json
 !/backend/src/**/*.ts
+!/backend/assets/*.json
 !/backend/tests/**/*.ts
 
 !/frontend/package.json

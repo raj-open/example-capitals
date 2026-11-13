@@ -88,6 +88,7 @@ All endpoints and their payloads are described in [models/api.yaml](models/api.y
 | `POST` | `/capital` | capital | `201` the created capital, `400`, `409` |
 | `PUT` | `/capital/{id}` | capital | `200` the updated capital, `400`, `404`, `409` |
 | `DELETE` | `/capital/{id}` | – | `204`, `404` |
+| `GET` | `/places` | – | `200` a sample of 300 ordinary cities (Natural Earth), which the map snaps to when adding a city |
 
 `/city` offers the same operations for all cities (capitals and others); `/capital` only lists capitals and rejects other cities with `400`.
 

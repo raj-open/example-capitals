@@ -16,8 +16,10 @@
 !/src
 !/src/**/
 !/src/**/*.ts
-# datasets (see /backend/src/data)
-!/src/data/*.json
+
+# non-code files (datasets, see /backend/src/data)
+!/assets
+!/assets/*.json
 
 !/tests
 !/tests/**/
