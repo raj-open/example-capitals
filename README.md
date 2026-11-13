@@ -5,7 +5,7 @@
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2022.18-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2026-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/DB-MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![licence](https://img.shields.io/badge/licence-MPL--2.0-orange)](LICENCE)
 
@@ -34,7 +34,7 @@ just demos
 
 ## Requirements ##
 
-- Node.js ≥ 22.18 and npm (the backend runs TypeScript natively, which needs type stripping without flags, i.e. Node.js 22.18 or newer)
+- Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file; the backend runs TypeScript natively via type stripping)
 
 - Docker (for the database)
 
