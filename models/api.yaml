@@ -212,6 +212,20 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
 
+  # /places: read only, independent of the DB (not affected by DATA_ACTIONS)
+  /places:
+    get:
+      summary: a sample of ordinary cities (Natural Earth), for snap-to in the UI
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Place"
+
 components:
   schemas:
     Health:
@@ -271,6 +285,24 @@ components:
                 (UUIDv5 as 22 base62 characters in groups, e.g. `1aB2cD3-eF4gH5i-J6kL7mN8`);
                 does not change when they are edited
               pattern: "^[0-9A-Za-z]{7}-[0-9A-Za-z]{7}-[0-9A-Za-z]{8}$"
+
+    Place:
+      description: a known city (not stored), e.g. to snap to on the map
+      type: object
+      required:
+        - name
+        - country
+        - latitude
+        - longitude
+      properties:
+        name:
+          type: string
+        country:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
 
     Error:
       type: object

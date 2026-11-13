@@ -36,6 +36,17 @@ describe("/health", () => {
     });
 });
 
+describe("/places", () => {
+    it("lists the sample of cities (no database needed)", async () => {
+        const response = await fetch(`${base}/places`);
+        expect(response.status).toBe(200);
+
+        const items = await response.json();
+        expect(items).toHaveLength(300);
+        expect(Object.keys(items[0]).sort()).toEqual(["country", "latitude", "longitude", "name"]);
+    });
+});
+
 // NOTE: no database here, so only requests that fail before the DB is reached
 describe("/capital", () => {
     it("rejects an invalid body before touching the DB", async () => {

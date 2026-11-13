@@ -7,6 +7,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { CapitalList } from "./components/CapitalList.tsx";
 import { useCapitals } from "./store/capital.ts";
 import { isDark, useMapStyle } from "./store/map.ts";
+import { usePlaces } from "./store/places.ts";
 import { useSettings } from "./store/settings.ts";
 
 // ----------------------------------------------------------------
@@ -22,6 +23,7 @@ const MapView = lazy(() => import("./components/MapView.tsx").then((module) => (
 
 export function App() {
     const load = useCapitals((state) => state.load);
+    const loadPlaces = usePlaces((state) => state.load);
     const lightPreset = useMapStyle((state) => state.lightPreset);
     const locale = useSettings((state) => state.locale);
     const capitalsOnly = useSettings((state) => state.capitalsOnly);
@@ -31,6 +33,11 @@ export function App() {
     useEffect(() => {
         load();
     }, [load, capitalsOnly]);
+
+    // known places for snap-to on the map (once)
+    useEffect(() => {
+        loadPlaces();
+    }, [loadPlaces]);
 
     // colour mode of the UI follows the light of the map (see /frontend/src/styles.css)
     useEffect(() => {

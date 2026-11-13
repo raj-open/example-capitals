@@ -25,10 +25,10 @@ import { useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import type { Capital } from "../../@api/types.gen.ts";
-import { places } from "../data/places.ts";
 import { DEFAULT_COLOUR, selectingOf, useCapitals, visible } from "../store/capital.ts";
 import type { Appearance } from "../store/map.ts";
 import { STYLES, texture, useMapStyle } from "../store/map.ts";
+import { places } from "../store/places.ts";
 import type { View } from "../store/view.ts";
 import { useView } from "../store/view.ts";
 import { countryName } from "../utils/countries.ts";

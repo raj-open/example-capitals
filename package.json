@@ -1,6 +1,6 @@
 {
   "name": "example-capitals",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "react frontend + REST api backend + DB",
   "private": true,
   "type": "module",
@@ -48,7 +48,7 @@
     "clean:all": "just clean-all"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.7",
     "@cucumber/cucumber": "^13.3.0",
     "@hey-api/openapi-ts": "0.99.0",
     "@playwright/test": "1.65.0",

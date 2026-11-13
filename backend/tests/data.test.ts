@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { LOCALE } from "../src/_core/locale.ts";
-import { cities } from "../src/data/cities.ts";
+import { cities, places } from "../src/data/cities.ts";
 import { EXAMPLES } from "../src/data/examples.ts";
 import { parseCapitalInput } from "../src/models/capital.ts";
 
@@ -38,5 +38,15 @@ describe("cities", () => {
         const items = cities();
         expect(items.length).toBe(300);
         expect(items.every(({ capital }) => !capital)).toBe(true);
+    });
+});
+
+describe("places", () => {
+    it("are the cities without region, capital or colour", () => {
+        const items = places();
+        expect(items.length).toBe(300);
+        expect(items).toEqual(
+            cities().map(({ name, country, latitude, longitude }) => ({ name, country, latitude, longitude })),
+        );
     });
 });
