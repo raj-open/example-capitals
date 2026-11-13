@@ -106,11 +106,15 @@ describe("useCapitals", () => {
 
         useSettings.setState({ capitalsOnly: true });
         await useCapitals.getState().load();
-        expect(api.list).toHaveBeenLastCalledWith("capital");
+        expect(api.list).toHaveBeenLastCalledWith("capital", { country: undefined });
+
+        useSettings.setState({ capitalsOnly: true });
+        await useCapitals.getState().load("Japan");
+        expect(api.list).toHaveBeenLastCalledWith("capital", { country: "Japan" });
 
         useSettings.setState({ capitalsOnly: false });
         await useCapitals.getState().load();
-        expect(api.list).toHaveBeenLastCalledWith("city");
+        expect(api.list).toHaveBeenLastCalledWith("city", { country: undefined });
     });
 
     it("deselects a city which is no longer listed", async () => {
