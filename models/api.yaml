@@ -25,14 +25,14 @@ paths:
   # /capital: capitals only; a city with `capital: false` is rejected with 400 (use /city)
   # /city: all cities; same shape and operations
   /capital:
-    parameters:
-      - name: country
-        in: query
-        required: false
-        schema:
-          type: string
     get:
       summary: all capital cities, by country
+      parameters:
+        - name: country
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: ok
@@ -42,6 +42,9 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Capital"
+
+        "400":
+          $ref: "#/components/responses/Error"
 
     post:
       summary: create a capital city
@@ -65,7 +68,7 @@ paths:
       - name: key
         in: path
         required: true
-        description: >-
+        description: |-
           id or name (case-insensitive) for GET, id for PUT and DELETE;
           names are not unique across countries, so GET by name returns the first by country
         schema:
@@ -139,7 +142,7 @@ paths:
       - name: key
         in: path
         required: true
-        description: >-
+        description: |-
           id or name (case-insensitive) for GET, id for PUT and DELETE;
           names are not unique across countries, so GET by name returns the first by country
         schema:
@@ -242,7 +245,7 @@ components:
           type: boolean
 
     CapitalInput:
-      description: >-
+      description: |-
         a city of a country; unique per (country, name), case-insensitive;
         at most one capital per country
       type: object
@@ -286,7 +289,7 @@ components:
               type: boolean
             id:
               type: string
-              description: >-
+              description: |-
                 derived from country and name on creation
                 (UUIDv5 as 22 base62 characters in groups, e.g. `1aB2cD3-eF4gH5i-J6kL7mN8`);
                 does not change when they are edited
