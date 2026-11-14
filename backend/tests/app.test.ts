@@ -49,7 +49,7 @@ describe("/places", () => {
 
 // NOTE: no database here, so only requests that fail before the DB is reached
 describe("/capital", () => {
-    it("gets", async () => {
+    it("rejects query to countries if multiple provided", async () => {
         const response = await fetch(`${base}/capital?country=Land1&country=Land2`);
         expect(response.status).toBe(400);
     });

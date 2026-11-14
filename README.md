@@ -84,6 +84,7 @@ All endpoints and their payloads are described in [models/api.yaml](models/api.y
 | :----- | :--- | :--- | :-------- |
 | `GET` | `/health` | – | `200` `{"ok": true}`, `503` `{"ok": false}` if the database does not answer |
 | `GET` | `/capital` | – | `200` all capitals, sorted by country |
+| `GET` | `/capital?country={country}` | – | `200` a list with at most one capital if found for country name, `400` if country not a single value |
 | `GET` | `/capital/{key}` | – | `200` the capital with this id or name, `404` if there is none |
 | `POST` | `/capital` | capital | `201` the created capital, `400`, `409` |
 | `PUT` | `/capital/{id}` | capital | `200` the updated capital, `400`, `404`, `409` |
