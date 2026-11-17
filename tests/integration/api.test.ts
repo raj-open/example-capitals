@@ -1,23 +1,20 @@
 /**
  * Integration: API + database (requires `just serve-db`).
  *
+ * The backend binary runs with the settings of /.env.
  * The tests share the database with `just dev`,
- * so they only use made-up capitals, which are removed before and after each test.
+ * so they only use made-up capitals, which are removed (via the API) before and after each test.
  */
 
 // ----------------------------------------------------------------
 // IMPORTS
 // ----------------------------------------------------------------
 
-import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { close, connect } from "../../backend/src/db/client.ts";
-import { capitals } from "../../backend/src/db/collections.ts";
-
-import { createApp } from "../../backend/src/app.ts";
-import type { Capital, CapitalInput } from "../../backend/src/models/capital.ts";
+// NOTE: the types generated from /models/api.yaml (`just models`)
+import type { Capital, CapitalInput } from "../../frontend/@api/types.gen.ts";
+import { type Server, start } from "../server.ts";
 
 // ----------------------------------------------------------------
 // LOCAL CONSTANTS
@@ -66,21 +63,17 @@ const COUNTRIES: CapitalInput[] = [
 // ----------------------------------------------------------------
 
 let server: Server;
-let base: string;
 
 // ----------------------------------------------------------------
 // HOOKS
 // ----------------------------------------------------------------
 
 beforeAll(async () => {
-    await connect();
-    server = createApp().listen(0);
-    base = `http://localhost:${(server.address() as AddressInfo).port}`;
+    server = await start();
 });
 
-afterAll(async () => {
-    server?.close();
-    await close();
+afterAll(() => {
+    server?.stop();
 });
 
 beforeEach(cleanUp);
@@ -92,7 +85,7 @@ afterEach(cleanUp);
 
 describe("/health", () => {
     it("responds ok", async () => {
-        const response = await fetch(`${base}/health`);
+        const response = await fetch(`${server.base}/health`);
         expect(await response.json()).toEqual({ ok: true });
     });
 });
@@ -231,7 +224,6 @@ describe("/capital?country", () => {
     });
 
     afterAll(async () => {
-        console.log(ids);
         for (const id of ids) {
             await deleteCity(id);
         }
@@ -283,10 +275,10 @@ describe("/capital?country", () => {
 
 async function send(method: string, path: string, body?: unknown): Promise<Response> {
     if (body === undefined) {
-        return fetch(`${base}${path}`, { method });
+        return fetch(`${server.base}${path}`, { method });
     }
 
-    return fetch(`${base}${path}`, {
+    return fetch(`${server.base}${path}`, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -312,6 +304,11 @@ async function createCity(input: CapitalInput): Promise<Capital> {
  * Removes the made-up capitals (incl. renamed ones), leaving all other data untouched.
  */
 async function cleanUp(): Promise<void> {
-    const countries = [FIRST.country, SECOND.country];
-    await capitals().deleteMany({ country: { $in: countries } });
+    for (const country of [FIRST.country, SECOND.country]) {
+        const items: Capital[] = await (await send("GET", `/city?country=${encodeURIComponent(country)}`)).json();
+
+        for (const { id } of items) {
+            await deleteCity(id, "city");
+        }
+    }
 }
