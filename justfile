@@ -18,6 +18,9 @@ lint_paths := "frontend tests db templates package.json tsconfig.base.json biome
 # cargo from rustup (`~/.cargo/bin`) also where the shell profile is not loaded (e.g. GUI apps)
 export PATH := env("CARGO_HOME", env("HOME", "") / ".cargo") / "bin" + ":" + env("PATH")
 
+# archiver for C code in Rust crates (see /templates/template.env)
+export AR := env("PATH_AR", env("AR", "ar"))
+
 # the backend (Rust): cargo with its manifest; `--locked` never rewrites /backend/Cargo.lock
 manifest := "--manifest-path backend/Cargo.toml"
 
