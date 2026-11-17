@@ -5,7 +5,7 @@
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Rust](https://img.shields.io/badge/Rust-%E2%89%A5%201.88-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-%E2%89%A5%201.89-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2026-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/DB-MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![licence](https://img.shields.io/badge/licence-MPL--2.0-orange)](LICENCE)
@@ -35,7 +35,7 @@ just demos
 
 ## Requirements ##
 
-- Rust ≥ 1.88 with clippy and rustfmt (e.g. via [rustup](https://rustup.rs)), for the backend
+- Rust ≥ 1.89 with clippy and rustfmt (e.g. via [rustup](https://rustup.rs)), for the backend
 
 - Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file), for the frontend and the tests
 
