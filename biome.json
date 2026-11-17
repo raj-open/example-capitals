@@ -2,15 +2,12 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
     "includes": [
-      "backend/src/**",
-      "backend/tests/**",
       "frontend/src/**",
       "frontend/tests/**",
       "frontend/vite.config.ts",
       "tests/**",
       "db/**",
       "*.json",
-      "backend/*.json",
       "frontend/*.json",
       "templates/*.json"
     ]

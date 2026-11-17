@@ -38,7 +38,6 @@
     "fsevents": false
   },
   "workspaces": [
-    "backend",
     "frontend"
   ],
   "scripts": {
