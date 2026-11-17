@@ -5,6 +5,7 @@
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Rust](https://img.shields.io/badge/Rust-%E2%89%A5%201.88-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2026-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/DB-MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![licence](https://img.shields.io/badge/licence-MPL--2.0-orange)](LICENCE)
@@ -26,15 +27,17 @@ just demos
 
 - [frontend](frontend): React + TypeScript, Zustand, Mapbox (Vite)
 
-- [backend](backend): Node.js + TypeScript (run natively, no build step), Express, MongoDB driver
+- [backend](backend): Rust, axum, MongoDB driver, reqwest (rustls)
 
 - [db](db/schema.js): MongoDB in Docker; the schema runs automatically on the first start
 
-- [models](models/api.yaml): OpenAPI description of the endpoints; TypeScript types are generated from it via `@hey-api/openapi-ts` into `backend/@api` and `frontend/@api` (`just models`)
+- [models](models/api.yaml): OpenAPI description of the endpoints; TypeScript types are generated from it via `@hey-api/openapi-ts` into `frontend/@api` (`just models`); the backend mirrors them in [backend/src/models](backend/src/models)
 
 ## Requirements ##
 
-- Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file; the backend runs TypeScript natively via type stripping)
+- Rust ≥ 1.88 with clippy and rustfmt (e.g. via [rustup](https://rustup.rs)), for the backend
+
+- Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file), for the frontend and the tests
 
 - Docker (for the database)
 
@@ -66,7 +69,7 @@ When done:
 
 ```bash
 just stop-db     # stops MongoDB (data is kept)
-just clean       # removes build artefacts and generated types
+just clean       # removes build artefacts (incl. backend/target) and generated types
 just clean-all   # also removes dependencies, playwright browsers and the docker container, network and volume
 ```
 
@@ -186,7 +189,7 @@ just tests-unit
 ### Behavioural tests ###
 
 Describe the API's behaviour in plain sentences (Gherkin), in [tests/behave/features](tests/behave/features).
-They run the API in-process, without database.
+They run the backend binary, without database.
 
 ```bash
 just tests-behave
