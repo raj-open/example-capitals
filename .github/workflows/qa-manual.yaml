@@ -55,6 +55,11 @@ jobs:
 
       - uses: extractions/setup-just@v4
 
+      # NOTE: for the backend; clippy and rustfmt for `just lint-check`
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
       - name: Setup
         run: |-
           # NOTE: variables and secrets of the GitHub environment, else of the repository
