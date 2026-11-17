@@ -1,6 +1,6 @@
 /**
  * End-to-end: UI + API + database (requires `just serve-db`).
- * The servers are started unless already running.
+ * The servers are started unless already running (the backend as built by `just`).
  */
 
 // ----------------------------------------------------------------
@@ -8,6 +8,8 @@
 // ----------------------------------------------------------------
 
 import { defineConfig, devices } from "@playwright/test";
+
+import { BINARY } from "../server.ts";
 
 // ----------------------------------------------------------------
 // LOCAL CONSTANTS
@@ -34,7 +36,7 @@ export default defineConfig({
     ],
     webServer: [
         {
-            command: "node backend/src/index.ts",
+            command: JSON.stringify(BINARY),
             cwd: "../..",
             url: `http://localhost:${port}/health`,
             reuseExistingServer: true,

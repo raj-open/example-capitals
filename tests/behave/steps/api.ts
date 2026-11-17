@@ -1,5 +1,5 @@
 /**
- * Steps for requests against the API (in-process, without database).
+ * Steps for requests against the API (the backend binary, without database).
  */
 
 // ----------------------------------------------------------------
@@ -7,33 +7,35 @@
 // ----------------------------------------------------------------
 
 import assert from "node:assert/strict";
-import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
-import { After, Before, Then, When, type World } from "@cucumber/cucumber";
+import { AfterAll, BeforeAll, Then, When, type World } from "@cucumber/cucumber";
 
-import { createApp } from "../../../backend/src/app.ts";
+import { type Server, start } from "../../server.ts";
 
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------
 
 interface State extends World {
-    server: Server;
-    base: string;
     response: Response;
 }
+
+// ----------------------------------------------------------------
+// LOCAL VARIABLES
+// ----------------------------------------------------------------
+
+/** one backend for all scenarios */
+let server: Server;
 
 // ----------------------------------------------------------------
 // HOOKS
 // ----------------------------------------------------------------
 
-Before(function (this: State) {
-    this.server = createApp().listen(0);
-    this.base = `http://localhost:${(this.server.address() as AddressInfo).port}`;
+BeforeAll(async () => {
+    server = await start({ DATABASE_HOST: "" });
 });
 
-After(function (this: State) {
-    this.server.close();
+AfterAll(() => {
+    server?.stop();
 });
 
 // ----------------------------------------------------------------
@@ -41,11 +43,11 @@ After(function (this: State) {
 // ----------------------------------------------------------------
 
 When("I request {string}", async function (this: State, request: string) {
-    this.response = await send(this.base, request);
+    this.response = await send(server.base, request);
 });
 
 When("I send {string} with body {}", async function (this: State, request: string, body: string) {
-    this.response = await send(this.base, request, JSON.parse(body));
+    this.response = await send(server.base, request, JSON.parse(body));
 });
 
 Then("the response status is {int}", function (this: State, status: number) {

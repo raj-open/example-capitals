@@ -22,11 +22,12 @@
 
 !/templates/template*
 
-!/backend/package.json
-!/backend/tsconfig.json
-!/backend/src/**/*.ts
+!/backend/Cargo.toml
+!/backend/Cargo.lock
+!/backend/rustfmt.toml
+!/backend/src/**/*.rs
 !/backend/assets/*.json
-!/backend/tests/**/*.ts
+!/backend/tests/**/*.rs
 
 !/frontend/package.json
 !/frontend/tsconfig.json

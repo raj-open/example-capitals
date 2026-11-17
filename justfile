@@ -13,7 +13,16 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # ----------------------------------------------------------------
 
 # explicit paths, so biome never scans local-only folders (which may contain other biome configs)
-lint_paths := "backend frontend tests db templates package.json tsconfig.base.json biome.json"
+lint_paths := "frontend tests db templates package.json tsconfig.base.json biome.json"
+
+# cargo from rustup (`~/.cargo/bin`) also where the shell profile is not loaded (e.g. GUI apps)
+export PATH := env("CARGO_HOME", env("HOME", "") / ".cargo") / "bin" + ":" + env("PATH")
+
+# archiver for C code in Rust crates (see /templates/template.env)
+export AR := env("PATH_AR", env("AR", "ar"))
+
+# the backend (Rust): cargo with its manifest; `--locked` never rewrites /backend/Cargo.lock
+manifest := "--manifest-path backend/Cargo.toml"
 
 # the backend (for the data recipes)
 api := "http://localhost:" + env("PORT", "3001")
@@ -43,10 +52,10 @@ setup:
     @just _deps
     @just models
 
-# generate TypeScript types from /models/api.yaml into /backend/@api and /frontend/@api (not committed)
+# generate TypeScript types from /models/api.yaml into /frontend/@api (not committed);
+# the backend (Rust) mirrors them in /backend/src/models
 [group('setup')]
 models: _deps
-    npx --no -- openapi-ts -i ./models/api.yaml -o ./backend/@api -p @hey-api/typescript --no-log-file
     npx --no -- openapi-ts -i ./models/api.yaml -o ./frontend/@api -p @hey-api/typescript --no-log-file
 
 # install exactly as the lock file says (`npm ci`); never rewrite an existing lock file.
@@ -58,10 +67,10 @@ _deps:
     #!/usr/bin/env bash
     set -euo pipefail
     marker="node_modules/.package-lock.json"
-    manifests="package-lock.json package.json backend/package.json frontend/package.json"
+    manifests="package-lock.json package.json frontend/package.json"
     if [ ! -f package-lock.json ]; then
         # resolve from scratch: from an existing node_modules, npm writes no `resolved`/`integrity`
-        rm -rf node_modules backend/node_modules frontend/node_modules
+        rm -rf node_modules frontend/node_modules
         npm install
 
     elif [ ! -f "${marker}" ]; then
@@ -71,6 +80,14 @@ _deps:
         npm ci
 
     fi
+
+# as `_deps`, for the backend: create /backend/Cargo.lock only if missing (to upgrade: delete it, then `just build`)
+_crates:
+    @[ -f backend/Cargo.lock ] || cargo generate-lockfile {{manifest}}
+
+# build the backend (debug, fast) for dev and tests
+_backend: _crates
+    cargo build --locked {{manifest}}
 
 # ----------------------------------------------------------------
 # RUN
@@ -92,15 +109,15 @@ clear-db:
     -docker compose down --volumes
     docker compose up -d db
 
-# run backend and frontend with hot reload
+# run backend and frontend (hot reload for the frontend)
 [group('run')]
 dev: _deps
     npx --no -- concurrently -n api,web -c blue,green "just dev-backend" "just dev-frontend"
 
-# run the backend with hot reload
+# run the backend (no hot reload: restart after changes)
 [group('run')]
-dev-backend:
-    node --watch backend/src/index.ts
+dev-backend: _crates
+    cargo run --locked {{manifest}}
 
 # run the frontend with hot reload
 [group('run')]
@@ -138,10 +155,11 @@ _data method path:
 # BUILD
 # ----------------------------------------------------------------
 
-# type-check everything and bundle the frontend (backend runs from source)
+# type-check everything, bundle the frontend and build the backend (release: /backend/target/release/backend)
 [group('build')]
 build: _deps check
     npx --no -- vite build --config frontend/vite.config.ts frontend
+    cargo build --locked --release {{manifest}}
 
 # ----------------------------------------------------------------
 # TESTS
@@ -151,25 +169,25 @@ build: _deps check
 [group('tests')]
 tests: tests-unit tests-behave tests-integration tests-e2e
 
-# unit tests in /backend/tests and /frontend/tests
+# unit tests in /backend/tests (cargo) and /frontend/tests (vitest)
 [group('tests')]
-tests-unit: _deps
-    npx --no -- vitest run --root backend
+tests-unit: _deps _crates
+    cargo test --locked {{manifest}}
     npx --no -- vitest run --root frontend
 
-# behavioural tests (gherkin) in /tests/behave
+# behavioural tests (gherkin) in /tests/behave, against the backend binary without a database
 [group('tests')]
-tests-behave: _deps
+tests-behave: _deps _backend
     npx --no -- cucumber-js --import "tests/behave/steps/**/*.ts" "tests/behave/features/**/*.feature"
 
 # integration tests (API + DB) in /tests/integration; need `just serve-db`
 [group('tests')]
-tests-integration: _deps
+tests-integration: _deps _backend
     npx --no -- vitest run --root tests/integration
 
 # end-to-end tests (UI + API + DB) in /tests/e2e; need `just serve-db`
 [group('tests')]
-tests-e2e: _deps
+tests-e2e: _deps _backend
     npx --no -- playwright install chromium
     npx --no -- playwright test --config tests/e2e/playwright.config.ts
 
@@ -179,7 +197,7 @@ tests-e2e: _deps
 
 # screenshots for /demos (WebP) and the social preview of the repo (UI + API + DB); needs `just serve-db` and capitals in the DB
 [group('docs')]
-demos: _deps
+demos: _deps _backend
     npx --no -- playwright install chromium
     npx --no -- playwright test --config tests/demos/playwright.config.ts
 
@@ -189,43 +207,49 @@ demos: _deps
 
 # type-check backend, frontend and /tests
 [group('quality')]
-check: _deps models
-    npx --no -- tsc -p backend
+check: _deps _crates models
+    cargo check --locked --all-targets {{manifest}}
     npx --no -- tsc -p frontend
     npx --no -- tsc -p tests
 
 # format and lint, with auto-fixes where possible
 [group('quality')]
-prettify: _deps
+prettify: _deps _crates
     npx --no -- biome check --write {{lint_paths}}
+    cargo clippy --locked --all-targets --fix --allow-dirty --allow-staged {{manifest}}
+    cargo fmt {{manifest}}
 
 # as prettify, but only reports; then type-checks
 [group('quality')]
-lint-check: _deps
+lint-check: _deps _crates
     npx --no -- biome check {{lint_paths}}
+    cargo fmt --check {{manifest}}
+    cargo clippy --locked --all-targets {{manifest}} -- -D warnings
     @just check
 
 # ----------------------------------------------------------------
 # MAINTENANCE
 # ----------------------------------------------------------------
 
-# set the version in all manifests and /dist/VERSION
+# set the version in all manifests (incl. /backend/Cargo.toml and its entry in Cargo.lock) and /dist/VERSION
 [group('maintenance')]
-version value:
+version value: _crates
     npm version "{{value}}" --no-git-tag-version --workspaces --include-workspace-root --allow-same-version
+    node -e 'const fs = require("node:fs"); const path = "backend/Cargo.toml"; fs.writeFileSync(path, fs.readFileSync(path, "utf8").replace(/^version = ".*"$/m, `version = "${process.argv[1]}"`))' "{{value}}"
+    cargo update --workspace {{manifest}}
     echo "{{value}}" > dist/VERSION
 
-# remove build artefacts and generated types (`just build` restores)
+# remove build artefacts (incl. the backend's, which are large) and generated types (`just build` restores)
 [group('maintenance')]
 clean:
-    rm -rf frontend/dist .cache backend/@api frontend/@api
+    rm -rf frontend/dist .cache frontend/@api backend/target
 
 # remove dependencies and playwright browsers (`just setup` and `just tests-e2e` restore)
 [group('maintenance')]
 clean-deps:
     @# before node_modules, as it needs playwright; `-` = skip if already gone
     -npx --no -- playwright uninstall
-    rm -rf node_modules backend/node_modules frontend/node_modules
+    rm -rf node_modules frontend/node_modules
 
 # remove docker container, network and volume (data) of this project (`just serve-db` restores)
 [group('maintenance')]
