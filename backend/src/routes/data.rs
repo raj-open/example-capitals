@@ -20,14 +20,13 @@ use axum::middleware::from_fn_with_state;
 use axum::response::Response;
 use axum::routing::delete;
 use axum::routing::post;
-use serde_json::Value;
-use serde_json::json;
 
 use crate::_core::errors::HttpError;
 use crate::_core::errors::Result;
 use crate::_core::state::AppState;
 use crate::data::cities::cities;
 use crate::data::examples::examples;
+use crate::models::api::Count;
 use crate::services::capital as service;
 use crate::services::countries::import_capitals;
 
@@ -53,19 +52,19 @@ async fn guard(State(state): State<AppState>, request: Request, next: Next) -> R
     Ok(next.run(request).await)
 }
 
-async fn clear(State(state): State<AppState>) -> Result<Json<Value>> {
+async fn clear(State(state): State<AppState>) -> Result<Json<Count>> {
     count(service::clear(&state).await?)
 }
 
-async fn add_examples(State(state): State<AppState>) -> Result<Json<Value>> {
+async fn add_examples(State(state): State<AppState>) -> Result<Json<Count>> {
     count(service::insert_many(&state, examples()).await?)
 }
 
-async fn add_capitals(State(state): State<AppState>) -> Result<Json<Value>> {
+async fn add_capitals(State(state): State<AppState>) -> Result<Json<Count>> {
     count(import_capitals(&state).await?)
 }
 
-async fn add_cities(State(state): State<AppState>) -> Result<Json<Value>> {
+async fn add_cities(State(state): State<AppState>) -> Result<Json<Count>> {
     count(service::insert_many(&state, cities()).await?)
 }
 
@@ -73,6 +72,7 @@ async fn add_cities(State(state): State<AppState>) -> Result<Json<Value>> {
 // AUXILIARY METHODS
 // ----------------------------------------------------------------
 
-fn count(value: u64) -> Result<Json<Value>> {
-    Ok(Json(json!({ "count": value })))
+fn count(value: u64) -> Result<Json<Count>> {
+    let count = i64::try_from(value).map_err(HttpError::internal)?;
+    Ok(Json(Count { count }))
 }

@@ -43,7 +43,7 @@ fn keeps_an_explicit_capital_flag() {
 
 #[test]
 fn rejects_invalid_bodies() {
-    let bodies: [Value; 8] = [
+    let bodies: [Value; 9] = [
         Value::Null,
         json!({}),
         json!({ "name": "", "country": "France", "latitude": 0, "longitude": 0 }),
@@ -51,7 +51,8 @@ fn rejects_invalid_bodies() {
         json!({ "name": "Paris", "country": "France", "latitude": 0, "longitude": "2" }),
         json!({ "name": "Paris", "country": "France", "latitude": 0, "longitude": 2, "capital": "yes" }),
         json!({ "name": "Paris", "country": "France", "latitude": 0, "longitude": 2, "colour": "blue" }),
-        json!({ "name": "Paris", "country": "France", "latitude": 0, "longitude": 2, "colour": null }),
+        json!({ "name": "  ", "country": "France", "latitude": 0, "longitude": 2 }),
+        json!({ "country": "France", "latitude": 0, "longitude": 2 }),
     ];
 
     for body in bodies {

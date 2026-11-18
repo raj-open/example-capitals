@@ -50,13 +50,21 @@ setup:
     cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml
     cp templates/template-devcontainer.Dockerfile .devcontainer/Dockerfile
     @just _deps
-    @just models
+    @just build-models
 
-# generate TypeScript types from /models/api.yaml into /frontend/@api (not committed);
-# the backend (Rust) mirrors them in /backend/src/models
+# generate the types of the API from /models/api.yaml (not committed), for frontend and backend
 [group('setup')]
-models: _deps
+build-models: build-models-frontend build-models-backend
+
+# TypeScript types into /frontend/@api (via @hey-api/openapi-ts)
+[group('setup')]
+build-models-frontend: _deps
     npx --no -- openapi-ts -i ./models/api.yaml -o ./frontend/@api -p @hey-api/typescript --no-log-file
+
+# Rust types into /backend/@api (via the binary `codegen` of the backend, without the app: see `[features]` in /backend/Cargo.toml)
+[group('setup')]
+build-models-backend: _crates
+    cargo run --locked --quiet --no-default-features --features codegen --bin codegen {{manifest}} -- models/api.yaml backend/@api/api.rs
 
 # install exactly as the lock file says (`npm ci`); never rewrite an existing lock file.
 # a lock file is created (from scratch) only if missing: to upgrade, delete /package-lock.json, then run `just build`.
@@ -86,7 +94,7 @@ _crates:
     @[ -f backend/Cargo.lock ] || cargo generate-lockfile {{manifest}}
 
 # build the backend (debug, fast) for dev and tests
-_backend: _crates
+_backend: _crates build-models-backend
     cargo build --locked {{manifest}}
 
 # ----------------------------------------------------------------
@@ -116,7 +124,7 @@ dev: _deps
 
 # run the backend (no hot reload: restart after changes)
 [group('run')]
-dev-backend: _crates
+dev-backend: _crates build-models-backend
     cargo run --locked {{manifest}}
 
 # run the frontend with hot reload
@@ -171,7 +179,7 @@ tests: tests-unit tests-behave tests-integration tests-e2e
 
 # unit tests in /backend/tests (cargo) and /frontend/tests (vitest)
 [group('tests')]
-tests-unit: _deps _crates
+tests-unit: _deps _crates build-models-backend
     cargo test --locked {{manifest}}
     npx --no -- vitest run --root frontend
 
@@ -207,24 +215,24 @@ demos: _deps _backend
 
 # type-check backend, frontend and /tests
 [group('quality')]
-check: _deps _crates models
-    cargo check --locked --all-targets {{manifest}}
+check: _deps _crates build-models
+    cargo check --locked --all-features --all-targets {{manifest}}
     npx --no -- tsc -p frontend
     npx --no -- tsc -p tests
 
 # format and lint, with auto-fixes where possible
 [group('quality')]
-prettify: _deps _crates
+prettify: _deps _crates build-models-backend
     npx --no -- biome check --write {{lint_paths}}
-    cargo clippy --locked --all-targets --fix --allow-dirty --allow-staged {{manifest}}
+    cargo clippy --locked --all-features --all-targets --fix --allow-dirty --allow-staged {{manifest}}
     cargo fmt {{manifest}}
 
 # as prettify, but only reports; then type-checks
 [group('quality')]
-lint-check: _deps _crates
+lint-check: _deps _crates build-models-backend
     npx --no -- biome check {{lint_paths}}
     cargo fmt --check {{manifest}}
-    cargo clippy --locked --all-targets {{manifest}} -- -D warnings
+    cargo clippy --locked --all-features --all-targets {{manifest}} -- -D warnings
     @just check
 
 # ----------------------------------------------------------------
@@ -242,7 +250,7 @@ version value: _crates
 # remove build artefacts (incl. the backend's, which are large) and generated types (`just build` restores)
 [group('maintenance')]
 clean:
-    rm -rf frontend/dist .cache frontend/@api backend/target
+    rm -rf frontend/dist .cache frontend/@api backend/@api backend/target
 
 # remove dependencies and playwright browsers (`just setup` and `just tests-e2e` restore)
 [group('maintenance')]

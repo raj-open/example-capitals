@@ -14,7 +14,7 @@ use axum::routing::get;
 
 use crate::_core::state::AppState;
 use crate::data::cities::places;
-use crate::models::place::Place;
+use crate::models::api::Place;
 
 // ----------------------------------------------------------------
 // ROUTES
