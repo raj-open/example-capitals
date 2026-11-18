@@ -17,9 +17,17 @@ use std::str::FromStr;
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub port: u16,
+    pub log: Log,
     pub database: Database,
     pub data: Data,
     pub restcountries: RestCountries,
+}
+
+/// Log of the requests (see /backend/src/_core/log.rs).
+#[derive(Debug, Clone)]
+pub struct Log {
+    /// also the bodies (shortened); set LOG_BODIES=false where they may contain personal data
+    pub bodies: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +67,9 @@ impl Settings {
     pub fn from_env() -> Self {
         Self {
             port: number("PORT", 3001),
+            log: Log {
+                bodies: text("LOG_BODIES", "true") != "false",
+            },
             database: Database {
                 host: text("DATABASE_HOST", "localhost"),
                 port: number("DATABASE_PORT", 27017),

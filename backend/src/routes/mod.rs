@@ -14,7 +14,7 @@ pub mod places;
 // ----------------------------------------------------------------
 
 use axum::Router;
-use axum::middleware::from_fn;
+use axum::middleware::from_fn_with_state;
 use tower_http::cors::CorsLayer;
 
 use crate::_core::errors::HttpError;
@@ -37,6 +37,6 @@ pub fn app(state: AppState) -> Router {
         .fallback(|| async { HttpError::not_found("not found") })
         .layer(CorsLayer::permissive())
         // outermost, so every request is logged with its final status
-        .layer(from_fn(log_request))
+        .layer(from_fn_with_state(state.clone(), log_request))
         .with_state(state)
 }
