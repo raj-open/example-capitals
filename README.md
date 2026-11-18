@@ -73,7 +73,7 @@ just clean       # removes build artefacts (incl. backend/target) and generated 
 just clean-all   # also removes dependencies, playwright browsers and the docker container, network and volume
 ```
 
-Run `just` for all recipes.
+Run `just` for all recipes. [backend](backend) and [frontend](frontend) also have their own justfiles with the same recipe names (e.g. `just build`, `just tests-unit` inside the folder); run `just build-models` at the root first, as it copies the models into both.
 
 No just on the host? Run `npm run setup:devcontainer` (needs only Node and npm), then open the repo in a dev container (needs Docker; MongoDB included). The container installs just and generates the types, so all recipes above work in its terminal. Outside it, the `npm run` scripts need just as well, as they only delegate to the justfile. The dev container config is copied from [templates](templates), so for a GitHub Codespace (nothing needed on the host) commit the generated `.devcontainer` folder to a fork first.
 
