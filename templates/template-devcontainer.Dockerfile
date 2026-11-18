@@ -28,6 +28,11 @@ RUN apt-get update \
 RUN npm install --global npm@^12.2.2 \
     && npm cache clean --force
 
+# mount points of the build folders (named volumes, see the compose file), owned by the workspace user:
+# docker gives a new volume the ownership of its mount point in the image
+RUN mkdir -p /workspace/node_modules /workspace/frontend/node_modules /workspace/backend/target \
+    && chown -R node:node /workspace
+
 # system libraries of the browser for the e2e tests (`just tests-e2e` downloads the browser itself);
 # NOTE: the version of Playwright as in /package.json
 RUN npx --yes playwright@1.65.1 install-deps chromium \
