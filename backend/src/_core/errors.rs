@@ -21,6 +21,10 @@ pub type Result<T> = std::result::Result<T, HttpError>;
 // CLASSES
 // ----------------------------------------------------------------
 
+/// The message of an error response, attached to it for the log of the requests (see /backend/src/_core/log.rs).
+#[derive(Debug, Clone)]
+pub struct ErrorMessage(pub String);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpError {
     pub status: StatusCode,
@@ -57,7 +61,7 @@ impl HttpError {
 
     /// An unexpected error: logged, but not exposed to the client.
     pub fn internal(err: impl fmt::Display) -> Self {
-        eprintln!("{err}");
+        tracing::error!("{err}");
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")
     }
 }
@@ -73,9 +77,11 @@ impl std::error::Error for HttpError {}
 impl IntoResponse for HttpError {
     fn into_response(self) -> Response {
         let body = crate::models::api::Error {
-            error: Some(self.message),
+            error: Some(self.message.clone()),
         };
-        (self.status, Json(body)).into_response()
+        let mut response = (self.status, Json(body)).into_response();
+        response.extensions_mut().insert(ErrorMessage(self.message));
+        response
     }
 }
 

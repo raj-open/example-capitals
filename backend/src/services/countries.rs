@@ -219,7 +219,7 @@ async fn upsert(state: &AppState, items: Vec<CapitalData>) -> Result<u64> {
     }
 
     if !skipped.is_empty() {
-        eprintln!("skipped {} conflicting capitals: {skipped:?}", skipped.len());
+        tracing::warn!("skipped {} conflicting capitals: {skipped:?}", skipped.len());
     }
 
     Ok(count)

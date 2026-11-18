@@ -46,10 +46,11 @@ export async function start(env: Record<string, string> = {}): Promise<Server> {
         let output = "";
         child.stdout.setEncoding("utf8");
 
-        // the backend prints `API on http://localhost:{port}` once it listens; later output is consumed and dropped
+        // the backend logs `API on http://localhost:{port}` once it listens (maybe with colour codes around it);
+        // later output is consumed and dropped
         child.stdout.on("data", (chunk: string) => {
             output += chunk;
-            const match = output.match(/API on (http:\/\/\S+)/);
+            const match = output.match(/API on (http:\/\/[\w.:-]+)/);
 
             if (match) {
                 resolve(match[1]);

@@ -10,6 +10,8 @@
 use std::net::Ipv6Addr;
 
 use tokio::net::TcpListener;
+use tracing::error;
+use tracing::info;
 
 use backend::_core::settings::Settings;
 use backend::AppState;
@@ -33,6 +35,13 @@ async fn main() {
         .expect("no other crypto provider installed");
 
     let settings = Settings::from_env();
+
+    // log with time and level, up to LOG_LEVEL (see /backend/src/_core/log.rs)
+    tracing_subscriber::fmt()
+        .with_max_level(settings.log.level)
+        .with_target(false)
+        .init();
+
     let client = client::connect(&settings.database)
         .await
         .expect("invalid database settings");
@@ -43,7 +52,7 @@ async fn main() {
         .await
         .expect("port available");
     let port = listener.local_addr().expect("bound").port();
-    println!("API on http://localhost:{port}");
+    info!("API on http://localhost:{port}");
 
     tokio::spawn(add_examples(state.clone()));
     axum::serve(listener, app(state)).await.expect("server runs");
@@ -59,8 +68,8 @@ async fn add_examples(state: AppState) {
     }
 
     match capital::insert_if_empty(&state, examples()).await {
-        Ok(0) => println!("cities already stored"),
-        Ok(count) => println!("empty DB: added {count} example cities"),
-        Err(err) => eprintln!("adding the examples failed: {err}"),
+        Ok(0) => info!("cities already stored"),
+        Ok(count) => info!("empty DB: added {count} example cities"),
+        Err(err) => error!("adding the examples failed: {err}"),
     }
 }
