@@ -2,7 +2,10 @@
 //!
 //! Layers: `routes` (HTTP) → `services` (logic) → `db` (MongoDB);
 //! errors are returned as `HttpError` (/backend/src/_core/errors.rs) and rendered as `{"error": …}`.
-//! The shape of the API is defined in /models/api.yaml (mirrored by /backend/src/models).
+//! The shape of the API is defined in /models/api.yaml; its types are generated from it (`just build-models`).
+
+// only with the dependencies of the app (see `[features]` in /backend/Cargo.toml)
+#![cfg(feature = "server")]
 
 // ----------------------------------------------------------------
 // MODULES
