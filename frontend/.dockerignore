@@ -1,0 +1,36 @@
+/**
+
+# ----------------------------------------------------------------
+# ROOT
+# ----------------------------------------------------------------
+
+!/justfile
+!/.npmrc
+!/package.json
+!/package-lock.json
+!/tsconfig.json
+!/vite.config.ts
+
+# ----------------------------------------------------------------
+# PROJECT
+# ----------------------------------------------------------------
+
+!/index.html
+!/assets/*.svg
+!/assets/*.png
+!/src/**/*.ts
+!/src/**/*.tsx
+!/src/**/*.css
+!/tests/**/*.ts
+!/tests/**/*.tsx
+
+# the copy of /models (by `just build-models` of the repo), needed to generate the types
+!/models/*.yaml
+
+# ----------------------------------------------------------------
+# FORCE REMOVE
+# ----------------------------------------------------------------
+
+**/.DS_Store
+**/__archive__*
+**/node_modules

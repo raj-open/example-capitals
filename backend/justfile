@@ -1,0 +1,128 @@
+# Task runner of the backend (Rust); also called by the justfile of the repo. `just` lists recipes; `just menu` picks one.
+# NOTE: /backend/models/api.yaml is copied here by `just build-models` of the repo (not committed).
+
+# ----------------------------------------------------------------
+# SETTINGS
+# ----------------------------------------------------------------
+
+set dotenv-load := true
+set dotenv-path := "../.env"
+set positional-arguments := true
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# ----------------------------------------------------------------
+# LOCAL VARIABLES
+# ----------------------------------------------------------------
+
+# cargo from rustup (`~/.cargo/bin`) also where the shell profile is not loaded (e.g. GUI apps)
+export PATH := env("CARGO_HOME", env("HOME", "") / ".cargo") / "bin" + ":" + env("PATH")
+
+# archiver for C code in Rust crates (see /templates/template.env)
+export AR := env("PATH_AR", env("AR", "ar"))
+
+# ----------------------------------------------------------------
+# MENU
+# ----------------------------------------------------------------
+
+_default:
+    @- just --unsorted --list
+
+menu:
+    @- just --unsorted --choose
+
+# ----------------------------------------------------------------
+# BUILD
+# ----------------------------------------------------------------
+
+# optimised build (release: target/release/backend)
+[group('build')]
+build: _crates build-models
+    cargo build --locked --release
+
+# fast build (debug: target/debug/backend), for dev and tests
+[group('build')]
+build-dev: _crates build-models
+    cargo build --locked
+
+# Rust types of the API from models/api.yaml into @api/api.rs (not committed),
+# via the binary `codegen`, built without the app (see `[features]` in Cargo.toml)
+[group('build')]
+build-models: _crates
+    cargo run \
+        --locked --quiet \
+        --no-default-features --features "codegen" \
+        --bin "codegen" \
+        -- "models/api.yaml" "@api/api.rs"
+
+# create Cargo.lock only if missing (to upgrade: delete it, then `just build`); `--locked` never rewrites it
+_crates:
+    @[ -f "Cargo.lock" ] || cargo generate-lockfile
+
+# ----------------------------------------------------------------
+# RUN
+# ----------------------------------------------------------------
+
+# run the server (no hot reload: restart after changes)
+[group('run')]
+dev: _crates build-models
+    cargo run --locked
+
+# ----------------------------------------------------------------
+# TESTS
+# ----------------------------------------------------------------
+
+# unit tests in tests
+[group('tests')]
+tests-unit: _crates build-models
+    cargo test --locked
+
+# ----------------------------------------------------------------
+# QUALITY
+# ----------------------------------------------------------------
+
+# type-check all targets (server and codegen)
+[group('quality')]
+check: _crates build-models
+    cargo check \
+        --locked \
+        --all-features --all-targets
+
+# format and lint, with auto-fixes where possible
+[group('quality')]
+prettify: _crates build-models
+    cargo clippy \
+        --locked \
+        --all-features --all-targets \
+        --fix --allow-dirty --allow-staged
+    cargo fmt --all
+
+# as prettify, but only reports; then type-checks
+[group('quality')]
+lint-check: _crates build-models
+    cargo fmt --all --check
+    cargo clippy \
+        --locked \
+        --all-features --all-targets \
+        -- -D "warnings"
+    @just check
+
+# ----------------------------------------------------------------
+# MAINTENANCE
+# ----------------------------------------------------------------
+
+# set the version in Cargo.toml and its entry in Cargo.lock
+[group('maintenance')]
+version value: _crates
+    @# the only line starting with `version =` is the one of the package; `-i.bak` works with GNU and BSD sed
+    sed -i.bak 's/^version = ".*"$/version = "{{value}}"/' "Cargo.toml"
+    rm "Cargo.toml.bak"
+    cargo update --workspace
+
+# remove build artefacts (large), generated types and the copy of the models (`just build` of the repo restores)
+[group('maintenance')]
+clean:
+    rm -rf "target" "@api" "models"
+
+# all of the above (no clean-deps: the crates live in the cache of cargo, `~/.cargo`, shared by all projects)
+[group('maintenance')]
+clean-all: clean

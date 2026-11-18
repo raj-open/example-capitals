@@ -37,9 +37,6 @@
   "allowScripts": {
     "fsevents": false
   },
-  "workspaces": [
-    "frontend"
-  ],
   "scripts": {
     "setup": "just setup",
     "setup:devcontainer": "mkdir -p .devcontainer && cp templates/template-devcontainer.json .devcontainer/devcontainer.json && cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml && cp templates/template-devcontainer.Dockerfile .devcontainer/Dockerfile",
@@ -64,14 +61,11 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@cucumber/cucumber": "^13.3.0",
-    "@hey-api/openapi-ts": "0.99.0",
     "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",
     "concurrently": "^10.0.7",
     "typescript": "6.0.3",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0"
-  },
-  "overrides": {
-    "js-yaml": "^5.5.0"
   }
 }
