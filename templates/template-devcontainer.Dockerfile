@@ -27,3 +27,9 @@ RUN apt-get update \
 # npm as pinned in /package.json (`devEngines`), else installs fail
 RUN npm install --global npm@^12.2.2 \
     && npm cache clean --force
+
+# system libraries of the browser for the e2e tests (`just tests-e2e` downloads the browser itself);
+# NOTE: the version of Playwright as in /package.json
+RUN npx --yes playwright@1.65.1 install-deps chromium \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm cache clean --force
