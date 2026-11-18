@@ -5,6 +5,10 @@
 # ROOT
 # ----------------------------------------------------------------
 
+!/justfile
+!/.dockerignore
+!/.npmrc
+!/package-lock.json
 !/package.json
 !/tsconfig.json
 !/vite.config.ts
@@ -15,8 +19,8 @@
 
 !/index.html
 !/assets
-!/assets/favicon.svg
-!/assets/apple-touch-icon.png
+!/assets/*.svg
+!/assets/*.png
 !/src
 !/src/**/
 !/src/**/*.css

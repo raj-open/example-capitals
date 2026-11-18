@@ -2,8 +2,26 @@
   "name": "frontend",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=26",
+      "onFail": "error"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": "^12.2.2",
+      "onFail": "error"
+    }
+  },
+  "allowScripts": {
+    "fsevents": false
+  },
   "scripts": {
-    "dev": "just dev-frontend",
+    "dev": "just dev",
     "build": "just build",
     "check": "just check",
     "test": "just tests-unit"
@@ -15,12 +33,18 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@hey-api/openapi-ts": "0.99.0",
+    "@types/node": "26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "typescript": "6.0.3",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "js-yaml": "^5.5.0"
   },
   "version": "1.4.1"
 }

@@ -1,0 +1,131 @@
+# Task runner of the frontend (React); also called by the justfile of the repo. `just` lists recipes; `just menu` picks one.
+# NOTE: /frontend/models/api.yaml is copied here by `just build-models` of the repo (not committed).
+
+# ----------------------------------------------------------------
+# SETTINGS
+# ----------------------------------------------------------------
+
+set dotenv-load := true
+set dotenv-path := "../.env"
+set positional-arguments := true
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# ----------------------------------------------------------------
+# LOCAL VARIABLES
+# ----------------------------------------------------------------
+
+# explicit paths (the biome config is the one of the repo)
+lint_paths := "src tests vite.config.ts package.json tsconfig.json"
+
+# ----------------------------------------------------------------
+# MENU
+# ----------------------------------------------------------------
+
+_default:
+    @- just --unsorted --list
+
+menu:
+    @- just --unsorted --choose
+
+# ----------------------------------------------------------------
+# BUILD
+# ----------------------------------------------------------------
+
+# type-check and bundle (dist)
+[group('build')]
+build: _deps check
+    npx --no -- vite build --config "vite.config.ts" "."
+
+# TypeScript types of the API from models/api.yaml into @api (not committed); `./` as openapi-ts reads `a/b` as a registry
+[group('build')]
+build-models: _deps
+    npx --no -- openapi-ts \
+        -i "./models/api.yaml" \
+        -o "./@api" \
+        -p "@hey-api/typescript" \
+        --no-log-file
+
+# install as the lock file says (`npm ci`), when needed; a missing lock file is created (to upgrade: delete it)
+_deps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    marker="node_modules/.package-lock.json"
+    manifests="package-lock.json package.json"
+    if [ ! -f "package-lock.json" ]; then
+        # resolve from scratch: from an existing node_modules, npm writes no `resolved`/`integrity`
+        rm -rf "node_modules"
+        npm install --no-audit --no-fund
+
+    elif [ ! -f "${marker}" ]; then
+        npm ci --no-audit --no-fund
+
+    elif [ -n "$(find ${manifests} -newer "${marker}")" ]; then
+        npm ci --no-audit --no-fund
+
+    fi
+
+# ----------------------------------------------------------------
+# RUN
+# ----------------------------------------------------------------
+
+# run the dev server with hot reload
+[group('run')]
+dev: _deps build-models
+    npx --no -- vite --config "vite.config.ts" "."
+
+# ----------------------------------------------------------------
+# TESTS
+# ----------------------------------------------------------------
+
+# unit tests in tests
+[group('tests')]
+tests-unit: _deps
+    npx --no -- vitest run --root "."
+
+# ----------------------------------------------------------------
+# QUALITY
+# ----------------------------------------------------------------
+
+# type-check
+[group('quality')]
+check: _deps build-models
+    npx --no -- tsc -p "."
+
+# format and lint, with auto-fixes where possible
+[group('quality')]
+prettify: _deps
+    npx --no -- biome check --write {{lint_paths}}
+
+# as prettify, but only reports; then type-checks
+[group('quality')]
+lint-check: _deps
+    npx --no -- biome check {{lint_paths}}
+    @just check
+
+# known vulnerabilities of the dependencies (installs are quiet about them)
+[group('quality')]
+audit: _deps
+    npm audit
+
+# ----------------------------------------------------------------
+# MAINTENANCE
+# ----------------------------------------------------------------
+
+# set the version in package.json (and package-lock.json)
+[group('maintenance')]
+version value: _deps
+    npm version "{{value}}" --no-git-tag-version --allow-same-version
+
+# remove build artefacts, generated types and the copy of the models (`just build` of the repo restores)
+[group('maintenance')]
+clean:
+    rm -rf "dist" "@api" "models"
+
+# remove dependencies (`just build` restores)
+[group('maintenance')]
+clean-deps:
+    rm -rf "node_modules"
+
+# all of the above
+[group('maintenance')]
+clean-all: clean clean-deps
