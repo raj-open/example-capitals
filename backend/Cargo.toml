@@ -80,6 +80,8 @@ server = [
   "dep:rustls",
   "dep:tokio",
   "dep:tower-http",
+  "dep:tracing",
+  "dep:tracing-subscriber",
   "dep:unicode-normalization",
   "dep:uuid",
 ]
@@ -111,6 +113,8 @@ reqwest = { version = "0.13.5", default-features = false, features = ["json", "r
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread", "time"], optional = true }
 tower-http = { version = "0.7.1", features = ["cors"], optional = true }
+tracing = { version = "0.1.44", default-features = false, features = ["std"], optional = true }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["ansi", "fmt", "std"], optional = true }
 unicode-normalization = { version = "0.1", optional = true }
 uuid = { version = "1.29.3", features = ["v5"], optional = true }
 

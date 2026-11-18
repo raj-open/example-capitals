@@ -1,4 +1,6 @@
-//! Log of the requests: one line each (method, path with query, status, duration, the message of an error), on stdout;
+//! Log (`tracing`, set up in /backend/src/main.rs, level by LOG_LEVEL) and the log of the requests:
+//! one line each (method, path with query, status, duration, the message of an error),
+//! at the level of its status (5xx `ERROR`, 4xx `WARN`, else `INFO`);
 //! with LOG_BODIES (default) also the body of the request, shortened (bodies may contain personal data: switch off where so).
 
 // ----------------------------------------------------------------
@@ -14,6 +16,10 @@ use axum::extract::State;
 use axum::http::header::CONTENT_LENGTH;
 use axum::middleware::Next;
 use axum::response::Response;
+
+use tracing::error;
+use tracing::info;
+use tracing::warn;
 
 use super::errors::ErrorMessage;
 use super::state::AppState;
@@ -46,14 +52,23 @@ pub async fn log_request(State(state): State<AppState>, request: Request, next: 
     let response = next.run(request).await;
 
     let millis = start.elapsed().as_secs_f64() * 1000.0;
-    let status = response.status().as_u16();
+    let status = response.status();
     let error = response
         .extensions()
         .get::<ErrorMessage>()
         .map(|ErrorMessage(message)| format!(": {message}"))
         .unwrap_or_default();
     let body = body.map(|text| format!(" | {text}")).unwrap_or_default();
-    println!("{method} {uri} {status} {millis:.1} ms{error}{body}");
+    let line = format!("{method} {uri} {} {millis:.1} ms{error}{body}", status.as_u16());
+
+    if status.is_server_error() {
+        error!("{line}");
+    } else if status.is_client_error() {
+        warn!("{line}");
+    } else {
+        info!("{line}");
+    }
+
     response
 }
 

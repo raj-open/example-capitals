@@ -61,7 +61,7 @@ impl HttpError {
 
     /// An unexpected error: logged, but not exposed to the client.
     pub fn internal(err: impl fmt::Display) -> Self {
-        eprintln!("{err}");
+        tracing::error!("{err}");
         Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal server error")
     }
 }

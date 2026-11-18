@@ -10,6 +10,8 @@ use std::env;
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use tracing::level_filters::LevelFilter;
+
 // ----------------------------------------------------------------
 // CLASSES
 // ----------------------------------------------------------------
@@ -23,9 +25,11 @@ pub struct Settings {
     pub restcountries: RestCountries,
 }
 
-/// Log of the requests (see /backend/src/_core/log.rs).
+/// Log (see /backend/src/_core/log.rs).
 #[derive(Debug, Clone)]
 pub struct Log {
+    /// most detailed level shown: `error`, `warn`, `info` (default), `debug`, `trace` or `off`
+    pub level: LevelFilter,
     /// also the bodies (shortened); set LOG_BODIES=false where they may contain personal data
     pub bodies: bool,
 }
@@ -68,6 +72,9 @@ impl Settings {
         Self {
             port: number("PORT", 3001),
             log: Log {
+                level: text("LOG_LEVEL", "info")
+                    .parse()
+                    .unwrap_or_else(|err| panic!("LOG_LEVEL is not a valid level: {err}")),
                 bodies: text("LOG_BODIES", "true") != "false",
             },
             database: Database {
