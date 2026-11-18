@@ -18,7 +18,7 @@ use serde_json::Value;
 use crate::_core::errors::HttpError;
 use crate::_core::errors::Result;
 use crate::_core::state::AppState;
-use crate::models::capital::Capital;
+use crate::models::api::Capital;
 use crate::models::capital::parse_capital_input;
 use crate::services::capital as service;
 use crate::services::capital::Scope;

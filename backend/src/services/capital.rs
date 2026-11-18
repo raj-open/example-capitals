@@ -20,7 +20,7 @@ use crate::_core::errors::Result;
 use crate::_core::ids::capital_id;
 use crate::_core::ids::is_id;
 use crate::_core::state::AppState;
-use crate::models::capital::Capital;
+use crate::models::api::Capital;
 use crate::models::capital::CapitalData;
 use crate::models::capital::CapitalDocument;
 
@@ -58,7 +58,7 @@ pub async fn list(state: &AppState, scope: Scope, country: Option<&str>) -> Resu
         .await?;
 
     let docs: Vec<CapitalDocument> = cursor.try_collect().await?;
-    Ok(docs.into_iter().map(Capital::from).collect())
+    docs.into_iter().map(Capital::try_from).collect()
 }
 
 /// Looks up one city by id or, for any other key, by name (case-insensitive, via the collation of the collection).
@@ -71,8 +71,8 @@ pub async fn get(state: &AppState, scope: Scope, key: &str) -> Result<Capital> {
         .find_one(query)
         .sort(doc! { "country": 1 })
         .await?
-        .map(Capital::from)
-        .ok_or_else(|| HttpError::not_found(format!(r#"no {} with id or name "{key}""#, noun(scope))))
+        .ok_or_else(|| HttpError::not_found(format!(r#"no {} with id or name "{key}""#, noun(scope))))?
+        .try_into()
 }
 
 pub async fn create(state: &AppState, scope: Scope, input: CapitalData) -> Result<Capital> {
@@ -83,7 +83,7 @@ pub async fn create(state: &AppState, scope: Scope, input: CapitalData) -> Resul
     };
 
     capitals(state)?.insert_one(&doc).await.map_err(as_conflict)?;
-    Ok(doc.into())
+    doc.try_into()
 }
 
 /// Replaces all fields of a city (PUT semantics); the id stays.
@@ -103,8 +103,8 @@ pub async fn update(state: &AppState, scope: Scope, id: &str, input: CapitalData
         .return_document(ReturnDocument::After)
         .await
         .map_err(as_conflict)?
-        .map(Capital::from)
-        .ok_or_else(|| HttpError::not_found(format!(r#"no {} with id "{id}""#, noun(scope))))
+        .ok_or_else(|| HttpError::not_found(format!(r#"no {} with id "{id}""#, noun(scope))))?
+        .try_into()
 }
 
 pub async fn remove(state: &AppState, scope: Scope, id: &str) -> Result<()> {

@@ -1,6 +1,6 @@
-//! City (capital or not): API shape, DB shape, and input parsing.
+//! City (capital or not): DB shape, conversion to the API shape, and input parsing.
 //!
-//! The API shape (`Capital`, `CapitalInput`) is defined in /models/api.yaml.
+//! The API shapes (`Capital`, `CapitalInput`) are generated from /models/api.yaml (see /backend/src/models/api.rs).
 
 // ----------------------------------------------------------------
 // IMPORTS
@@ -13,6 +13,7 @@ use serde_json::Value;
 use crate::_core::errors::HttpError;
 use crate::_core::errors::Result;
 use crate::_core::text::trim;
+use crate::models::api;
 
 // ----------------------------------------------------------------
 // CLASSES
@@ -40,17 +41,24 @@ pub struct CapitalDocument {
     pub data: CapitalData,
 }
 
-/// A city as returned by the API.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Capital {
-    pub id: String,
-    #[serde(flatten)]
-    pub data: CapitalData,
-}
+impl TryFrom<CapitalDocument> for api::Capital {
+    type Error = HttpError;
 
-impl From<CapitalDocument> for Capital {
-    fn from(CapitalDocument { id, data }: CapitalDocument) -> Self {
-        Self { id, data }
+    /// Fails only for a document which does not fit the schema of the API (an internal error).
+    fn try_from(CapitalDocument { id, data }: CapitalDocument) -> Result<Self> {
+        Ok(Self {
+            id: id.try_into().map_err(HttpError::internal)?,
+            name: data.name.try_into().map_err(HttpError::internal)?,
+            country: data.country.try_into().map_err(HttpError::internal)?,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            capital: data.capital,
+            colour: data
+                .colour
+                .map(TryInto::try_into)
+                .transpose()
+                .map_err(HttpError::internal)?,
+        })
     }
 }
 
@@ -58,45 +66,37 @@ impl From<CapitalDocument> for Capital {
 // METHODS
 // ----------------------------------------------------------------
 
-/// Validates a request body; `capital` defaults to true (so a body without it creates a capital).
-/// Only checks types and ranges, not uniqueness (enforced by the DB indexes).
+/// Validates a request body: first against the schema (`CapitalInput`: types, lengths, pattern),
+/// then what the schema does not express: names trimmed and non-empty, coordinates in range,
+/// `capital` defaulting to true, the colour in lower case.
+/// Uniqueness is enforced by the DB indexes.
 pub fn parse_capital_input(body: &Value) -> Result<CapitalData> {
-    let Some(body) = body.as_object() else {
+    if !body.is_object() {
         return Err(HttpError::bad_request("body must be an object"));
-    };
+    }
 
-    let (Some(name), Some(country)) = (text(body.get("name")), text(body.get("country"))) else {
+    let input: api::CapitalInput =
+        serde_json::from_value(body.clone()).map_err(|err| HttpError::bad_request(err.to_string()))?;
+
+    let (name, country) = (trim(&input.name), trim(&input.country));
+
+    if name.is_empty() || country.is_empty() {
         return Err(HttpError::bad_request("name and country must be non-empty strings"));
-    };
+    }
 
-    let (Some(latitude), Some(longitude)) = (
-        in_range(body.get("latitude"), 90.0),
-        in_range(body.get("longitude"), 180.0),
-    ) else {
+    if !in_range(input.latitude, 90.0) || !in_range(input.longitude, 180.0) {
         return Err(HttpError::bad_request(
             "latitude must be in [-90, 90] and longitude in [-180, 180]",
         ));
-    };
-
-    let capital = match body.get("capital") {
-        None => true,
-        Some(Value::Bool(value)) => *value,
-        Some(_) => return Err(HttpError::bad_request("capital must be a boolean")),
-    };
-
-    let colour = match body.get("colour") {
-        None => None,
-        Some(Value::String(value)) if is_colour(value) => Some(value.to_lowercase()),
-        Some(_) => return Err(HttpError::bad_request("colour must be a hex colour #rrggbb")),
-    };
+    }
 
     Ok(CapitalData {
-        name,
-        country,
-        latitude,
-        longitude,
-        capital,
-        colour,
+        name: name.to_string(),
+        country: country.to_string(),
+        latitude: input.latitude,
+        longitude: input.longitude,
+        capital: input.capital.unwrap_or(true),
+        colour: input.colour.map(|colour| colour.to_lowercase()),
     })
 }
 
@@ -104,18 +104,6 @@ pub fn parse_capital_input(body: &Value) -> Result<CapitalData> {
 // AUXILIARY METHODS
 // ----------------------------------------------------------------
 
-/// A non-empty string, trimmed.
-fn text(value: Option<&Value>) -> Option<String> {
-    let value = trim(value?.as_str()?);
-    (!value.is_empty()).then(|| value.to_string())
-}
-
-fn in_range(value: Option<&Value>, bound: f64) -> Option<f64> {
-    let value = value?.as_f64()?;
-    (value.is_finite() && value.abs() <= bound).then_some(value)
-}
-
-/// `#rrggbb`
-fn is_colour(value: &str) -> bool {
-    value.len() == 7 && value.starts_with('#') && value[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
+fn in_range(value: f64, bound: f64) -> bool {
+    value.is_finite() && value.abs() <= bound
 }

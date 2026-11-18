@@ -14,8 +14,8 @@
 use serde::Deserialize;
 
 use crate::_core::regions::region_colour;
+use crate::models::api::Place;
 use crate::models::capital::CapitalData;
-use crate::models::place::Place;
 
 // ----------------------------------------------------------------
 // LOCAL CONSTANTS

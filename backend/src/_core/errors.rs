@@ -10,7 +10,6 @@ use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use serde_json::json;
 
 // ----------------------------------------------------------------
 // TYPES
@@ -73,7 +72,10 @@ impl std::error::Error for HttpError {}
 
 impl IntoResponse for HttpError {
     fn into_response(self) -> Response {
-        (self.status, Json(json!({ "error": self.message }))).into_response()
+        let body = crate::models::api::Error {
+            error: Some(self.message),
+        };
+        (self.status, Json(body)).into_response()
     }
 }
 
