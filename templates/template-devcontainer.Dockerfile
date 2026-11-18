@@ -15,10 +15,12 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
 
-# a C toolchain for linking; CA certificates for cargo (node brings its own); clippy and rustfmt for `just lint-check`
+# a C toolchain for linking; CA certificates for cargo (node brings its own); curl for `just data-*`;
+# clippy and rustfmt for `just lint-check`
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         ca-certificates \
+        curl \
         gcc \
         libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
