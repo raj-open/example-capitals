@@ -291,7 +291,7 @@ function cover(width: number, height: number): string {
       <img src="${icon}" alt="" />
       <h1>Capital Cities</h1>
       <p>The capitals of the world on a map: list, search, add, edit and delete.</p>
-      <div class="stack"><span>React</span><span>TypeScript</span><span>Express</span><span>MongoDB</span><span>Mapbox</span></div>
+      <div class="stack"><span>React</span><span>TypeScript</span><span>Rust</span><span>MongoDB</span><span>Mapbox</span></div>
     </div>
     <img class="shot desktop" src="${image("overview.webp")}" alt="" />
     <img class="shot phone" src="${image("phone.webp")}" alt="" />

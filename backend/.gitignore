@@ -5,8 +5,11 @@
 # ROOT
 # ----------------------------------------------------------------
 
-!/package.json
-!/tsconfig.json
+!/justfile
+!/.dockerignore
+!/Cargo.toml
+!/Cargo.lock
+!/rustfmt.toml
 
 # ----------------------------------------------------------------
 # PROJECT
@@ -14,7 +17,7 @@
 
 !/src
 !/src/**/
-!/src/**/*.ts
+!/src/**/*.rs
 
 # non-code files (datasets, see /backend/src/data)
 !/assets
@@ -22,7 +25,7 @@
 
 !/tests
 !/tests/**/
-!/tests/**/*.ts
+!/tests/**/*.rs
 
 # ----------------------------------------------------------------
 # FORCE REMOVE
@@ -32,7 +35,6 @@
 **/*.tmp
 **/.DS_Store
 **/__archive__*
-**/node_modules
 
 # ----------------------------------------------------------------
 # FORCE RETAIN

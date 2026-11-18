@@ -1,8 +1,3 @@
-# NOTE: docker semantics differ from git:
-# `!/dir` re-includes the whole folder, so only file patterns are listed here,
-# and docker walks into excluded folders by itself (no `!/dir/**/` needed).
-# Only this file is read (root of the build context).
-
 /**
 
 # ----------------------------------------------------------------
@@ -22,20 +17,9 @@
 
 !/templates/template*
 
-!/backend/package.json
-!/backend/tsconfig.json
-!/backend/src/**/*.ts
-!/backend/assets/*.json
-!/backend/tests/**/*.ts
-
-!/frontend/package.json
-!/frontend/tsconfig.json
-!/frontend/vite.config.ts
-!/frontend/index.html
-!/frontend/src/**/*.ts
-!/frontend/src/**/*.tsx
-!/frontend/src/**/*.css
-!/frontend/tests/**/*.ts
+# whole, minus their artefacts (see FORCE REMOVE): docker does not read their .dockerignore here
+!/backend
+!/frontend
 
 !/db/*.js
 
@@ -51,6 +35,17 @@
 # FORCE REMOVE
 # ----------------------------------------------------------------
 
+# artefacts and local files of the parts (cf. their .dockerignore)
+/backend/target
+/backend/@api
+/backend/models
+/frontend/dist
+/frontend/@api
+/frontend/models
+
+**/.vscode
+**/.env
+**/*.tmp
 **/.DS_Store
 **/__archive__*
 **/node_modules

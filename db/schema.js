@@ -10,7 +10,7 @@
 const target = db.getSiblingDB(process.env.DATABASE_NAME || "capitals");
 
 // case-insensitive by default (applies to queries and to the unique indexes);
-// `en`, as MongoDB has no `en_GB` collation (see /backend/src/_core/locale.ts)
+// `en`, as MongoDB has no `en_GB` collation (case-insensitive comparison is the same for both)
 const collation = { locale: "en", strength: 2 };
 
 target.createCollection("capitals", {
@@ -21,7 +21,7 @@ target.createCollection("capitals", {
             required: ["name", "country", "latitude", "longitude", "capital"],
             additionalProperties: false,
             properties: {
-                // id derived from country + name: UUIDv5 as 22 base62 characters in groups (see /backend/src/_core/ids.ts)
+                // id derived from country + name: UUIDv5 as 22 base62 characters in groups (see /backend/src/_core/ids.rs)
                 _id: { bsonType: "string", pattern: "^[0-9A-Za-z]{7}-[0-9A-Za-z]{7}-[0-9A-Za-z]{8}$" },
                 name: { bsonType: "string", minLength: 1 },
                 country: { bsonType: "string", minLength: 1 },

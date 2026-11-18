@@ -4,7 +4,7 @@
   "service": "app",
   "workspaceFolder": "/workspace",
   "remoteUser": "node",
-  "postCreateCommand": "npm ci && just models",
+  "postCreateCommand": "just build-models",
   "forwardPorts": [
     5173,
     3001

@@ -5,6 +5,7 @@
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Rust](https://img.shields.io/badge/Rust-%E2%89%A5%201.97-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2026-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/DB-MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![licence](https://img.shields.io/badge/licence-MPL--2.0-orange)](LICENCE)
@@ -26,15 +27,17 @@ just demos
 
 - [frontend](frontend): React + TypeScript, Zustand, Mapbox (Vite)
 
-- [backend](backend): Node.js + TypeScript (run natively, no build step), Express, MongoDB driver
+- [backend](backend): Rust, axum, MongoDB driver, reqwest (rustls)
 
 - [db](db/schema.js): MongoDB in Docker; the schema runs automatically on the first start
 
-- [models](models/api.yaml): OpenAPI description of the endpoints; TypeScript types are generated from it via `@hey-api/openapi-ts` into `backend/@api` and `frontend/@api` (`just models`)
+- [models](models/api.yaml): OpenAPI description of the endpoints; types are generated from it (`just build-models`, not committed): TypeScript via `@hey-api/openapi-ts` into `frontend/@api`, Rust via [backend/src/bin/codegen](backend/src/bin/codegen/main.rs) (typify) into `backend/@api`
 
 ## Requirements ##
 
-- Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file; the backend runs TypeScript natively via type stripping)
+- Rust ≥ 1.97 with clippy and rustfmt (e.g. via [rustup](https://rustup.rs)), for the backend
+
+- Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file), for the frontend and the tests
 
 - Docker (for the database)
 
@@ -66,11 +69,11 @@ When done:
 
 ```bash
 just stop-db     # stops MongoDB (data is kept)
-just clean       # removes build artefacts and generated types
+just clean       # removes build artefacts (incl. backend/target) and generated types
 just clean-all   # also removes dependencies, playwright browsers and the docker container, network and volume
 ```
 
-Run `just` for all recipes.
+Run `just` for all recipes. [backend](backend) and [frontend](frontend) also have their own justfiles with the same recipe names (e.g. `just build`, `just tests-unit` inside the folder); run `just build-models` at the root first, as it copies the models into both.
 
 No just on the host? Run `npm run setup:devcontainer` (needs only Node and npm), then open the repo in a dev container (needs Docker; MongoDB included). The container installs just and generates the types, so all recipes above work in its terminal. Outside it, the `npm run` scripts need just as well, as they only delegate to the justfile. The dev container config is copied from [templates](templates), so for a GitHub Codespace (nothing needed on the host) commit the generated `.devcontainer` folder to a fork first.
 
@@ -186,7 +189,7 @@ just tests-unit
 ### Behavioural tests ###
 
 Describe the API's behaviour in plain sentences (Gherkin), in [tests/behave/features](tests/behave/features).
-They run the API in-process, without database.
+They run the backend binary, without database.
 
 ```bash
 just tests-behave
