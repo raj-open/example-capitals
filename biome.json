@@ -6,7 +6,7 @@
       "frontend/tests/**",
       "frontend/vite.config.ts",
       "tests/**",
-      "db/**",
+      "db/*.js",
       "*.json",
       "frontend/*.json",
       "templates/*.json"
