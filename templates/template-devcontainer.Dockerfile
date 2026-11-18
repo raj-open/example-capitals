@@ -15,12 +15,28 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
 
-# a C toolchain for linking; clippy and rustfmt for `just lint-check`
+# a C toolchain for linking; CA certificates for cargo (node brings its own); curl for `just data-*`;
+# clippy and rustfmt for `just lint-check`
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends gcc libc6-dev \
+    && apt-get install --yes --no-install-recommends \
+        ca-certificates \
+        curl \
+        gcc \
+        libc6-dev \
     && rm -rf /var/lib/apt/lists/* \
     && rustup component add clippy rustfmt
 
 # npm as pinned in /package.json (`devEngines`), else installs fail
 RUN npm install --global npm@^12.2.2 \
+    && npm cache clean --force
+
+# mount points of the build folders (named volumes, see the compose file), owned by the workspace user:
+# docker gives a new volume the ownership of its mount point in the image
+RUN mkdir -p /workspace/node_modules /workspace/frontend/node_modules /workspace/backend/target \
+    && chown -R node:node /workspace
+
+# system libraries of the browser for the e2e tests (`just tests-e2e` downloads the browser itself);
+# NOTE: the version of Playwright as in /package.json
+RUN npx --yes playwright@1.65.1 install-deps chromium \
+    && rm -rf /var/lib/apt/lists/* \
     && npm cache clean --force

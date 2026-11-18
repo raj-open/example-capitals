@@ -5,6 +5,10 @@
 volumes:
   # named volume for the MongoDB data (default settings)
   dbdata:
+  # build folders of the container (Linux), apart from those of the host (e.g. macOS) in the same workspace
+  node_modules:
+  frontend_node_modules:
+  backend_target:
 
 # ----------------------------------------------------------------
 # SERVICES
@@ -36,6 +40,10 @@ services:
 
     volumes:
       - "..:/workspace:cached"
+      # the container's own build folders (see the top-level volumes), owned by `node` (cf. Dockerfile)
+      - "node_modules:/workspace/node_modules"
+      - "frontend_node_modules:/workspace/frontend/node_modules"
+      - "backend_target:/workspace/backend/target"
 
     command: sleep infinity
 
