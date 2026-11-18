@@ -1,4 +1,6 @@
-# Task runner. `just` lists recipes; `just menu` picks one.
+# Task runner of the repo. `just` lists recipes; `just menu` picks one.
+# NOTE: /backend and /frontend have their own justfiles (same recipe names) and dependencies, called from here;
+# what spans both (setup, database, /tests, demos, version) lives here.
 
 # ----------------------------------------------------------------
 # SETTINGS
@@ -12,17 +14,12 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # LOCAL VARIABLES
 # ----------------------------------------------------------------
 
-# explicit paths, so biome never scans local-only folders (which may contain other biome configs)
-lint_paths := "frontend tests db templates package.json tsconfig.base.json biome.json"
+# explicit paths, so biome never scans local-only folders (which may contain other biome configs); /frontend lints itself
+lint_paths := "tests db templates package.json tsconfig.base.json biome.json"
 
-# cargo from rustup (`~/.cargo/bin`) also where the shell profile is not loaded (e.g. GUI apps)
-export PATH := env("CARGO_HOME", env("HOME", "") / ".cargo") / "bin" + ":" + env("PATH")
-
-# archiver for C code in Rust crates (see /templates/template.env)
-export AR := env("PATH_AR", env("AR", "ar"))
-
-# the backend (Rust): cargo with its manifest; `--locked` never rewrites /backend/Cargo.lock
-manifest := "--manifest-path backend/Cargo.toml"
+# the parts: `{{backend}} <recipe>` runs a recipe of /backend/justfile in /backend (likewise /frontend)
+backend := 'just --justfile "backend/justfile"'
+frontend := 'just --justfile "frontend/justfile"'
 
 # the backend (for the data recipes)
 api := "http://localhost:" + env("PORT", "3001")
@@ -38,64 +35,58 @@ menu:
     @- just --unsorted --choose
 
 # ----------------------------------------------------------------
-# SETUP
+# BUILD
 # ----------------------------------------------------------------
 
 # create .env (if missing) and .devcontainer from /templates; install dependencies
-[group('setup')]
+[group('build')]
 setup:
-    @[ -f .env ] || { cp templates/template.env .env; echo "created .env: fill in the values"; }
-    mkdir -p .devcontainer
-    cp templates/template-devcontainer.json .devcontainer/devcontainer.json
-    cp templates/template-devcontainer-compose.yaml .devcontainer/devcontainer-compose.yaml
-    cp templates/template-devcontainer.Dockerfile .devcontainer/Dockerfile
+    @[ -f ".env" ] || { cp "templates/template.env" ".env"; echo "created .env: fill in the values"; }
+    mkdir -p ".devcontainer"
+    cp "templates/template-devcontainer.json"         ".devcontainer/devcontainer.json"
+    cp "templates/template-devcontainer-compose.yaml" ".devcontainer/devcontainer-compose.yaml"
+    cp "templates/template-devcontainer.Dockerfile"   ".devcontainer/Dockerfile"
     @just _deps
     @just build-models
 
-# generate the types of the API from /models/api.yaml (not committed), for frontend and backend
-[group('setup')]
-build-models: build-models-frontend build-models-backend
+# build frontend (bundle) and backend (optimised), after type-checking everything
+[group('build')]
+build: _deps check
+    {{frontend}} build
+    {{backend}} build
 
-# TypeScript types into /frontend/@api (via @hey-api/openapi-ts)
-[group('setup')]
-build-models-frontend: _deps
-    npx --no -- openapi-ts -i ./models/api.yaml -o ./frontend/@api -p @hey-api/typescript --no-log-file
+# copy /models into frontend and backend (not committed), then generate the types of the API there
+[group('build')]
+build-models: _deps
+    mkdir -p "frontend/models" "backend/models"
+    cp "models/api.yaml" "frontend/models/api.yaml"
+    cp "models/api.yaml" "backend/models/api.yaml"
+    {{frontend}} build-models
+    {{backend}} build-models
 
-# Rust types into /backend/@api (via the binary `codegen` of the backend, without the app: see `[features]` in /backend/Cargo.toml)
-[group('setup')]
-build-models-backend: _crates
-    cargo run --locked --quiet --no-default-features --features codegen --bin codegen {{manifest}} -- models/api.yaml backend/@api/api.rs
+# fast build of the backend (debug), for the tests in /tests
+_backend: build-models
+    {{backend}} build-dev
 
-# install exactly as the lock file says (`npm ci`); never rewrite an existing lock file.
-# a lock file is created (from scratch) only if missing: to upgrade, delete /package-lock.json, then run `just build`.
-# reinstall if an install did not finish (npm writes node_modules/.package-lock.json last)
-# or a manifest/the lock file changed since (`npm ci` fails if they disagree);
-# npm and node versions are pinned via `devEngines` in /package.json
+# install the tooling of the repo (/tests, biome, playwright) as the lock file says (`npm ci`), when needed;
+# a missing lock file is created (to upgrade: delete it); /frontend installs its own
 _deps:
     #!/usr/bin/env bash
     set -euo pipefail
     marker="node_modules/.package-lock.json"
-    manifests="package-lock.json package.json frontend/package.json"
-    if [ ! -f package-lock.json ]; then
+    manifests="package-lock.json package.json"
+    if [ ! -f "package-lock.json" ]; then
         # resolve from scratch: from an existing node_modules, npm writes no `resolved`/`integrity`
-        rm -rf node_modules frontend/node_modules
-        npm install
+        rm -rf "node_modules"
+        npm install --no-audit --no-fund
 
     elif [ ! -f "${marker}" ]; then
-        npm ci
+        npm ci --no-audit --no-fund
 
     elif [ -n "$(find ${manifests} -newer "${marker}")" ]; then
-        npm ci
+        npm ci --no-audit --no-fund
 
     fi
-
-# as `_deps`, for the backend: create /backend/Cargo.lock only if missing (to upgrade: delete it, then `just build`)
-_crates:
-    @[ -f backend/Cargo.lock ] || cargo generate-lockfile {{manifest}}
-
-# build the backend (debug, fast) for dev and tests
-_backend: _crates build-models-backend
-    cargo build --locked {{manifest}}
 
 # ----------------------------------------------------------------
 # RUN
@@ -104,33 +95,35 @@ _backend: _crates build-models-backend
 # start the database (docker)
 [group('run')]
 serve-db:
-    docker compose up -d db
+    docker compose up -d "db"
 
 # stop the database (data is kept in the docker volume; `just clean-docker` removes it)
 [group('run')]
 stop-db:
-    docker compose stop db
+    docker compose stop "db"
 
 # clear the database: remove its volume and start it again (/db/schema.js runs on the empty volume)
 [group('run')]
 clear-db:
     -docker compose down --volumes
-    docker compose up -d db
+    docker compose up -d "db"
 
 # run backend and frontend (hot reload for the frontend)
 [group('run')]
-dev: _deps
-    npx --no -- concurrently -n api,web -c blue,green "just dev-backend" "just dev-frontend"
+dev: build-models
+    npx --no -- concurrently \
+        -n "api,web" -c "blue,green" \
+        "just dev-backend" "just dev-frontend"
 
 # run the backend (no hot reload: restart after changes)
 [group('run')]
-dev-backend: _crates build-models-backend
-    cargo run --locked {{manifest}}
+dev-backend:
+    {{backend}} dev
 
 # run the frontend with hot reload
 [group('run')]
 dev-frontend:
-    npx --no -- vite --config frontend/vite.config.ts frontend
+    {{frontend}} dev
 
 # ----------------------------------------------------------------
 # DATA (via the running backend, as the settings panel; 403 with DATA_ACTIONS=false)
@@ -139,35 +132,28 @@ dev-frontend:
 # remove all cities (the DB itself stays, unlike `just clear-db`)
 [group('data')]
 data-clear:
-    @just _data DELETE /data
+    @just _data "DELETE" "/data"
 
 # add the example cities (existing ones are skipped)
 [group('data')]
 data-examples:
-    @just _data POST /data/examples
+    @just _data "POST" "/data/examples"
 
 # import all capitals from REST Countries (costs requests of the monthly quota)
 [group('data')]
 data-capitals:
-    @just _data POST /data/capitals
+    @just _data "POST" "/data/capitals"
 
 # add the large sample of ordinary cities (existing ones are skipped)
 [group('data')]
 data-cities:
-    @just _data POST /data/cities
+    @just _data "POST" "/data/cities"
 
 _data method path:
-    curl --silent --show-error --fail-with-body -X "$1" "{{api}}$2" && echo
-
-# ----------------------------------------------------------------
-# BUILD
-# ----------------------------------------------------------------
-
-# type-check everything, bundle the frontend and build the backend (release: /backend/target/release/backend)
-[group('build')]
-build: _deps check
-    npx --no -- vite build --config frontend/vite.config.ts frontend
-    cargo build --locked --release {{manifest}}
+    curl \
+        --silent --show-error --fail-with-body \
+        -X "$1" "{{api}}$2" \
+        && echo
 
 # ----------------------------------------------------------------
 # TESTS
@@ -177,27 +163,29 @@ build: _deps check
 [group('tests')]
 tests: tests-unit tests-behave tests-integration tests-e2e
 
-# unit tests in /backend/tests (cargo) and /frontend/tests (vitest)
+# unit tests of the parts: /backend/tests (cargo), /frontend/tests (vitest)
 [group('tests')]
-tests-unit: _deps _crates build-models-backend
-    cargo test --locked {{manifest}}
-    npx --no -- vitest run --root frontend
+tests-unit: build-models
+    {{backend}} tests-unit
+    {{frontend}} tests-unit
 
 # behavioural tests (gherkin) in /tests/behave, against the backend binary without a database
 [group('tests')]
 tests-behave: _deps _backend
-    npx --no -- cucumber-js --import "tests/behave/steps/**/*.ts" "tests/behave/features/**/*.feature"
+    npx --no -- cucumber-js \
+        --import "tests/behave/steps/**/*.ts" \
+        "tests/behave/features/**/*.feature"
 
 # integration tests (API + DB) in /tests/integration; need `just serve-db`
 [group('tests')]
 tests-integration: _deps _backend
-    npx --no -- vitest run --root tests/integration
+    npx --no -- vitest run --root "tests/integration"
 
 # end-to-end tests (UI + API + DB) in /tests/e2e; need `just serve-db`
 [group('tests')]
 tests-e2e: _deps _backend
-    npx --no -- playwright install chromium
-    npx --no -- playwright test --config tests/e2e/playwright.config.ts
+    npx --no -- playwright install "chromium"
+    npx --no -- playwright test --config "tests/e2e/playwright.config.ts"
 
 # ----------------------------------------------------------------
 # DOCS
@@ -206,8 +194,8 @@ tests-e2e: _deps _backend
 # screenshots for /demos (WebP) and the social preview of the repo (UI + API + DB); needs `just serve-db` and capitals in the DB
 [group('docs')]
 demos: _deps _backend
-    npx --no -- playwright install chromium
-    npx --no -- playwright test --config tests/demos/playwright.config.ts
+    npx --no -- playwright install "chromium"
+    npx --no -- playwright test --config "tests/demos/playwright.config.ts"
 
 # ----------------------------------------------------------------
 # QUALITY
@@ -215,55 +203,69 @@ demos: _deps _backend
 
 # type-check backend, frontend and /tests
 [group('quality')]
-check: _deps _crates build-models
-    cargo check --locked --all-features --all-targets {{manifest}}
-    npx --no -- tsc -p frontend
-    npx --no -- tsc -p tests
+check: build-models
+    {{backend}} check
+    {{frontend}} check
+    npx --no -- tsc -p "tests"
 
 # format and lint, with auto-fixes where possible
 [group('quality')]
-prettify: _deps _crates build-models-backend
+prettify: build-models
     npx --no -- biome check --write {{lint_paths}}
-    cargo clippy --locked --all-features --all-targets --fix --allow-dirty --allow-staged {{manifest}}
-    cargo fmt {{manifest}}
+    {{backend}} prettify
+    {{frontend}} prettify
 
 # as prettify, but only reports; then type-checks
 [group('quality')]
-lint-check: _deps _crates build-models-backend
+lint-check: build-models
     npx --no -- biome check {{lint_paths}}
-    cargo fmt --check {{manifest}}
-    cargo clippy --locked --all-features --all-targets {{manifest}} -- -D warnings
-    @just check
+    {{backend}} lint-check
+    {{frontend}} lint-check
+    npx --no -- tsc -p "tests"
+
+# known vulnerabilities of the dependencies, of the repo and of /frontend (installs are quiet about them)
+[group('quality')]
+audit: _deps
+    #!/usr/bin/env bash
+    set -uo pipefail
+    # both, even if the first reports findings; fails if either does
+    status=0
+    npm audit || status=1
+    {{frontend}} audit || status=1
+    exit "${status}"
 
 # ----------------------------------------------------------------
 # MAINTENANCE
 # ----------------------------------------------------------------
 
-# set the version in all manifests (incl. /backend/Cargo.toml and its entry in Cargo.lock) and /dist/VERSION
+# set the version of the repo, /frontend and /backend, and in /dist/VERSION
 [group('maintenance')]
-version value: _crates
-    npm version "{{value}}" --no-git-tag-version --workspaces --include-workspace-root --allow-same-version
-    node -e 'const fs = require("node:fs"); const path = "backend/Cargo.toml"; fs.writeFileSync(path, fs.readFileSync(path, "utf8").replace(/^version = ".*"$/m, `version = "${process.argv[1]}"`))' "{{value}}"
-    cargo update --workspace {{manifest}}
-    echo "{{value}}" > dist/VERSION
+version value:
+    npm version "{{value}}" --no-git-tag-version --allow-same-version
+    {{frontend}} version "{{value}}"
+    {{backend}} version "{{value}}"
+    echo "{{value}}" > "dist/VERSION"
 
 # remove build artefacts (incl. the backend's, which are large) and generated types (`just build` restores)
 [group('maintenance')]
 clean:
-    rm -rf frontend/dist .cache frontend/@api backend/@api backend/target
+    {{backend}} clean
+    {{frontend}} clean
+    rm -rf ".cache"
 
 # remove dependencies and playwright browsers (`just setup` and `just tests-e2e` restore)
 [group('maintenance')]
 clean-deps:
     @# before node_modules, as it needs playwright; `-` = skip if already gone
     -npx --no -- playwright uninstall
-    rm -rf node_modules frontend/node_modules
+    rm -rf "node_modules"
+    {{frontend}} clean-deps
 
 # remove docker container, network and volume (data) of this project (`just serve-db` restores)
 [group('maintenance')]
 clean-docker:
     @# `--rmi local` keeps shared images such as mongo:9; `-` = skip if docker is not running
-    -docker compose down --volumes --rmi local
+    -docker compose down --volumes --rmi "local"
 
 # all of the above
 [group('maintenance')]
