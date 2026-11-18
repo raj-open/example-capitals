@@ -5,7 +5,7 @@
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Rust](https://img.shields.io/badge/Rust-%E2%89%A5%201.89-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/Rust-%E2%89%A5%201.97-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A5%2026-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/DB-MongoDB-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
 [![licence](https://img.shields.io/badge/licence-MPL--2.0-orange)](LICENCE)
@@ -31,11 +31,11 @@ just demos
 
 - [db](db/schema.js): MongoDB in Docker; the schema runs automatically on the first start
 
-- [models](models/api.yaml): OpenAPI description of the endpoints; TypeScript types are generated from it via `@hey-api/openapi-ts` into `frontend/@api` (`just models`); the backend mirrors them in [backend/src/models](backend/src/models)
+- [models](models/api.yaml): OpenAPI description of the endpoints; types are generated from it (`just build-models`, not committed): TypeScript via `@hey-api/openapi-ts` into `frontend/@api`, Rust via [backend/src/bin/codegen](backend/src/bin/codegen/main.rs) (typify) into `backend/@api`
 
 ## Requirements ##
 
-- Rust ≥ 1.89 with clippy and rustfmt (e.g. via [rustup](https://rustup.rs)), for the backend
+- Rust ≥ 1.97 with clippy and rustfmt (e.g. via [rustup](https://rustup.rs)), for the backend
 
 - Node.js ≥ 26 and npm 12 (pinned via `devEngines` in `package.json`, so that every machine writes the same lock file), for the frontend and the tests
 
