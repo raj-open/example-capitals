@@ -5,6 +5,8 @@
 # ROOT
 # ----------------------------------------------------------------
 
+!/justfile
+!/.dockerignore
 !/Cargo.toml
 !/Cargo.lock
 !/rustfmt.toml
